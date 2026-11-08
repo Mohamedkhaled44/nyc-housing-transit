@@ -143,10 +143,28 @@ Running the notebook top to bottom rewrites the three files in
 
 ---
 
-## Deployment (Render)
+## Deployment
+
+The app is a normal WSGI application, so it runs on anything that can host
+Flask. Configuration for the two easiest options is committed.
+
+### Option A — Vercel (`vercel.json`, `api/index.py`)
+
+```bash
+npm i -g vercel     # if the CLI is not already installed
+vercel login
+vercel --prod
+```
+
+`api/index.py` re-exports the Dash app's underlying Flask server as the WSGI
+callable Vercel looks for, and `vercel.json` routes every path to it and
+bundles `data/processed/` and `assets/` with the function.
+
+### Option B — Render (`render.yaml`)
 
 1. Push this repository to GitHub.
-2. On [render.com](https://render.com), **New → Web Service**, and connect the repo.
+2. On [render.com](https://render.com), **New → Blueprint** (picks up
+   `render.yaml` automatically), or **New → Web Service** and set it by hand:
 3. Settings:
    - **Environment**: Python 3
    - **Build command**: `pip install -r requirements.txt`
@@ -162,8 +180,7 @@ of inactivity and takes roughly 50 seconds to wake. The first page load after a
 quiet period is therefore slow — this is Render, not the app. Reload once and
 it is immediate.
 
-`.python-version` pins Python 3.13.3. If the build log reports that version as
-unavailable, change the file to `3.12` and redeploy. `gunicorn` does not run on
+`.python-version` pins Python 3.12, which both Render and Vercel support. `gunicorn` does not run on
 Windows — use `python app.py` for local testing.
 
 ---
