@@ -12,7 +12,11 @@ deployed instance starts fast and stays inside a free tier's memory budget.
 Interaction model required by the brief:
   * four dropdown filters          -> held as State
   * a free-text search box         -> parsed into those same dropdowns
-  * a single "Generate Report"     -> the only Input that redraws the charts
+  * a single "Generate Report"     -> the Input that redraws the charts
+
+The light/dark switch is a second Input to the same callback: the figures are
+rendered server-side, so a theme change has to re-render them. Filters stay
+State, so they still only take effect when the button is pressed.
 """
 
 from __future__ import annotations
@@ -26,28 +30,20 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, dcc, html
 
+# This module sits next to app.py, but app.py is imported in several ways
+# (directly, via `gunicorn app:server`, and via api/index.py on Vercel), and
+# not all of them put this directory on sys.path. Make it explicit.
+import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from theme import get_theme, plotly_layout  # noqa: E402  (path set up above)
+
 # --------------------------------------------------------------------------
-# Theme
+# Domain vocabulary
 # --------------------------------------------------------------------------
-HOUSING = "#4cc9f0"
-CRASH = "#ff5c68"
-INK = "#eaf0fb"
-MUTED = "#7c89a0"
-PAPER = "#121823"      # panel background — matches .card in style.css
-GRID = "#222c3f"
-
-# Cold -> hot. Reads as low -> high risk and stays legible on a dark panel,
-# unlike a classic YlOrRd whose pale low end vanishes against it.
-SEQ = ["#1f4e79", "#2e8bc0", "#6fd3c7", "#f7d774", "#f79256", "#ff4d6d"]
-
-BOROUGH_COLORS = {
-    "BRONX": "#c77dff",
-    "BROOKLYN": "#4cc9f0",
-    "MANHATTAN": "#ff5c68",
-    "QUEENS": "#80ed99",
-    "STATEN ISLAND": "#ffd166",
-}
-
 TIER_ORDER = ["No completions", "Q1 lowest", "Q2", "Q3", "Q4 highest"]
 
 ROAD_USERS = {
@@ -68,20 +64,6 @@ INCOME_BANDS = {
     "Deep affordability (ext. low + very low)": "units_deep_affordable",
 }
 
-# An explicit height is required: dcc.Graph is `responsive`, and inside a CSS
-# grid cell with no intrinsic height the plot would otherwise collapse to a
-# few pixels. The map and the heatmap override it below.
-PLOTLY_LAYOUT = dict(
-    height=430,
-    paper_bgcolor=PAPER,
-    plot_bgcolor=PAPER,
-    font=dict(family="Inter, Segoe UI, system-ui, sans-serif", size=12, color=INK),
-    margin=dict(l=62, r=24, t=66, b=92),
-    title=dict(font=dict(size=15, color=INK), x=0.01, xanchor="left"),
-    hoverlabel=dict(font_size=12),
-    legend=dict(orientation="h", y=-0.26, x=0, font=dict(size=11)),
-)
-
 # --------------------------------------------------------------------------
 # Data
 # --------------------------------------------------------------------------
@@ -91,15 +73,9 @@ PROCESSED = os.path.join(HERE, "data", "processed")
 
 def load_data():
     """Read the three processed tables written by the notebook."""
-    zip_year = pd.read_csv(
-        os.path.join(PROCESSED, "zip_year.csv"), dtype={"zip_code": str}
-    )
-    points = pd.read_csv(
-        os.path.join(PROCESSED, "housing_points.csv"), dtype={"zip_code": str}
-    )
-    factors = pd.read_csv(
-        os.path.join(PROCESSED, "crash_factors.csv"), dtype={"zip_code": str}
-    )
+    zip_year = pd.read_csv(os.path.join(PROCESSED, "zip_year.csv"), dtype={"zip_code": str})
+    points = pd.read_csv(os.path.join(PROCESSED, "housing_points.csv"), dtype={"zip_code": str})
+    factors = pd.read_csv(os.path.join(PROCESSED, "crash_factors.csv"), dtype={"zip_code": str})
     for frame in (zip_year, points, factors):
         if "borough" in frame:
             frame["borough"] = frame["borough"].astype(str).str.upper().str.strip()
@@ -126,10 +102,10 @@ def apply_filters(df, boroughs, years):
 
 
 def parse_search(query):
-    """Turn free text such as 'Brooklyn 2022 pedestrians extremely low' into filters.
+    """Turn free text such as 'Brooklyn 2022 pedestrians' into filter values.
 
     Returns (boroughs, years, income_band, road_user); each element is None when
-    the query said nothing about it, so the caller can leave that dropdown alone.
+    the query said nothing about it, so the caller leaves that dropdown alone.
     """
     if not query or not query.strip():
         return None, None, None, None
@@ -137,15 +113,12 @@ def parse_search(query):
     text = query.lower()
 
     found_boroughs = [b for b in BOROUGHS if b.lower() in text]
-    # "staten" on its own is unambiguous and people rarely type "island"
     if "staten" in text and "STATEN ISLAND" not in found_boroughs:
         found_boroughs.append("STATEN ISLAND")
     if "nyc" in text or "all boroughs" in text or "city" in text:
         found_boroughs = []
 
     found_years = [int(y) for y in re.findall(r"\b(20[12]\d)\b", text) if int(y) in YEARS]
-
-    # Year ranges: "2020-2023", "2020 to 2023"
     span = re.search(r"\b(20[12]\d)\s*(?:-|–|to|through)\s*(20[12]\d)\b", text)
     if span:
         lo, hi = sorted(int(g) for g in span.groups())
@@ -177,12 +150,7 @@ def parse_search(query):
     elif "everyone" in text or "all injuries" in text:
         user = "Everyone"
 
-    return (
-        found_boroughs if found_boroughs else None,
-        found_years if found_years else None,
-        band,
-        user,
-    )
+    return (found_boroughs or None, found_years or None, band, user)
 
 
 def development_tier(df):
@@ -191,8 +159,7 @@ def development_tier(df):
     tier = pd.Series("No completions", index=df.index, dtype="object")
     if int(built.sum()) >= 8:
         tier.loc[built] = pd.qcut(
-            df.loc[built, "units_total"].rank(method="first"),
-            4,
+            df.loc[built, "units_total"].rank(method="first"), 4,
             labels=["Q1 lowest", "Q2", "Q3", "Q4 highest"],
         ).astype(str)
     elif built.any():
@@ -200,38 +167,41 @@ def development_tier(df):
     return pd.Categorical(tier, categories=TIER_ORDER, ordered=True)
 
 
-def empty_figure(message="No data matches these filters."):
+# --------------------------------------------------------------------------
+# Figure helpers
+# --------------------------------------------------------------------------
+def empty_figure(T, message="No data matches these filters."):
     """Every chart falls back to this instead of raising on an empty frame."""
     fig = go.Figure()
     fig.add_annotation(
-        text=message, showarrow=False, font=dict(size=13.5, color=MUTED),
+        text=message, showarrow=False, font=dict(size=13.5, color=T["muted"]),
         xref="paper", yref="paper", x=0.5, y=0.5,
     )
-    fig.update_layout(**PLOTLY_LAYOUT)
+    fig.update_layout(**plotly_layout(T))
     fig.update_xaxes(visible=False)
     fig.update_yaxes(visible=False)
     return fig
 
 
-def style(fig, title, xtitle=None, ytitle=None):
-    fig.update_layout(**PLOTLY_LAYOUT)
+def style(fig, T, title, xtitle=None, ytitle=None):
+    fig.update_layout(**plotly_layout(T))
     fig.update_layout(title_text=title)
     if xtitle:
         fig.update_xaxes(title_text=xtitle)
     if ytitle:
         fig.update_yaxes(title_text=ytitle)
-    fig.update_xaxes(gridcolor=GRID, zerolinecolor=GRID, linecolor=GRID)
-    fig.update_yaxes(gridcolor=GRID, zerolinecolor=GRID, linecolor=GRID)
+    fig.update_xaxes(gridcolor=T["grid"], zerolinecolor=T["grid"], linecolor=T["grid"])
+    fig.update_yaxes(gridcolor=T["grid"], zerolinecolor=T["grid"], linecolor=T["grid"])
     return fig
 
 
 # --------------------------------------------------------------------------
 # Figures
 # --------------------------------------------------------------------------
-def fig_map(data, points, injured_col):
+def fig_map(data, points, injured_col, T):
     """Cross-domain map: ZIP bubbles (street risk) + individual buildings."""
     if data.empty:
-        return empty_figure()
+        return empty_figure(T)
 
     zips = (
         data.groupby(["zip_code", "borough"], as_index=False)
@@ -240,27 +210,25 @@ def fig_map(data, points, injured_col):
         .dropna(subset=["lat", "lon"])
     )
     if zips.empty:
-        return empty_figure("No mappable ZIP codes in this selection.")
+        return empty_figure(T, "No mappable ZIP codes in this selection.")
     zips["rate"] = 100 * zips["injured"] / zips["crashes"].replace(0, np.nan)
     zips = zips.dropna(subset=["rate"])
     if zips.empty:
-        return empty_figure("No mappable ZIP codes in this selection.")
+        return empty_figure(T, "No mappable ZIP codes in this selection.")
 
-    # Clamp the colour range to the 5th-95th percentile of what is actually on
-    # screen. Left unbounded, a couple of extreme ZIPs stretch the scale and
-    # push almost every circle into the first colour stop, so the map reads as
-    # uniformly blue and shows nothing.
+    # Clamp the colour range to the 5th-95th percentile of what is on screen.
+    # Left unbounded, a couple of extreme ZIPs stretch the scale and push almost
+    # every circle into the first colour stop, so the map shows nothing.
     lo, hi = zips["rate"].quantile([0.05, 0.95])
     if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
-        lo, hi = float(zips["rate"].min()), float(max(zips["rate"].max(), zips["rate"].min() + 1))
+        lo = float(zips["rate"].min())
+        hi = float(max(zips["rate"].max(), lo + 1))
 
     fig = px.scatter_map(
-        zips,
-        lat="lat", lon="lon", size="crashes", color="rate",
-        color_continuous_scale=SEQ, range_color=(lo, hi), size_max=34, zoom=9.2,
+        zips, lat="lat", lon="lon", size="crashes", color="rate",
+        color_continuous_scale=T["seq"], range_color=(lo, hi), size_max=34, zoom=9.2,
         center=dict(lat=40.714, lon=-73.94),
         custom_data=["zip_code", "borough", "units", "crashes", "rate"],
-        labels={"rate": "injuries / 100 crashes"},
     )
     fig.update_traces(
         hovertemplate=(
@@ -274,37 +242,34 @@ def fig_map(data, points, injured_col):
     mappable = points.dropna(subset=["lat", "lon"])
     if not mappable.empty:
         sample = mappable.nlargest(min(900, len(mappable)), "total_units")
-        fig.add_trace(
-            go.Scattermap(
-                lat=sample["lat"], lon=sample["lon"], mode="markers",
-                # White, not the housing blue: the risk ramp's low end is also
-                # blue, and the two layers were indistinguishable on the map.
-                marker=dict(size=5, color="#ffffff", opacity=0.9),
-                name="affordable buildings",
-                customdata=np.stack([sample["project_name"].astype(str),
-                                     sample["total_units"], sample["year"]], axis=-1),
-                hovertemplate=("<b>%{customdata[0]}</b><br>%{customdata[1]:,.0f} units"
-                               " · completed %{customdata[2]}<extra></extra>"),
-            )
-        )
+        fig.add_trace(go.Scattermap(
+            lat=sample["lat"], lon=sample["lon"], mode="markers",
+            # Deliberately not the housing colour: the low end of the risk ramp
+            # is also blue, and the two layers became indistinguishable.
+            marker=dict(size=5, color=T["building"], opacity=0.9),
+            name="affordable buildings",
+            customdata=np.stack([sample["project_name"].astype(str),
+                                 sample["total_units"], sample["year"]], axis=-1),
+            hovertemplate=("<b>%{customdata[0]}</b><br>%{customdata[1]:,.0f} units"
+                           " · completed %{customdata[2]}<extra></extra>"),
+        ))
 
-    fig.update_layout(**PLOTLY_LAYOUT)
+    fig.update_layout(**plotly_layout(T))
     fig.update_layout(
         title_text="Where the housing goes and where the streets hurt people",
-        map_style="carto-darkmatter",
+        map_style=T["map_style"],
         margin=dict(l=0, r=0, t=54, b=0),
-        height=520,
         coloraxis_colorbar=dict(title="injuries<br>per 100<br>crashes", thickness=12),
-        legend=dict(orientation="h", y=0.01, x=0.01, bgcolor="rgba(10,13,20,0.72)",
-                    font=dict(color=INK)),
+        legend=dict(orientation="h", y=0.01, x=0.01,
+                    bgcolor=T["legend_bg"], font=dict(color=T["ink"])),
     )
     return fig
 
 
-def fig_scatter(data, unit_col, injured_col, band_label, user_label):
+def fig_scatter(data, unit_col, injured_col, band_label, user_label, T):
     """Cross-domain scatter: units built vs. injury rate, one point per ZIP."""
     if data.empty:
-        return empty_figure()
+        return empty_figure(T)
 
     zips = (
         data.groupby(["zip_code", "borough"], as_index=False)
@@ -312,16 +277,16 @@ def fig_scatter(data, unit_col, injured_col, band_label, user_label):
     )
     zips = zips[(zips["crashes"] >= 50) & (zips["units"] > 0)]
     if len(zips) < 3:
-        return empty_figure("Too few ZIP codes with both housing and crash data here.")
+        return empty_figure(T, "Too few ZIP codes with both housing and crash data here.")
     zips["rate"] = 100 * zips["injured"] / zips["crashes"]
 
     fig = px.scatter(
         zips, x="units", y="rate", color="borough", size="crashes",
-        color_discrete_map=BOROUGH_COLORS, size_max=26, log_x=True,
+        color_discrete_map=T["boroughs"], size_max=26, log_x=True,
         custom_data=["zip_code", "units", "crashes", "rate"],
     )
     fig.update_traces(
-        marker=dict(line=dict(width=0.8, color="#0a0d14")),
+        marker=dict(line=dict(width=0.8, color=T["marker_line"])),
         hovertemplate=("<b>ZIP %{customdata[0]}</b><br>%{customdata[1]:,.0f} units<br>"
                        "%{customdata[2]:,.0f} crashes<br>"
                        "%{customdata[3]:.1f} injuries / 100 crashes<extra></extra>"),
@@ -333,26 +298,24 @@ def fig_scatter(data, unit_col, injured_col, band_label, user_label):
         slope, intercept = np.polyfit(log_units, zips["rate"], 1)
         xs = np.linspace(log_units.min(), log_units.max(), 40)
         r = float(np.corrcoef(log_units, zips["rate"])[0, 1])
-        fig.add_trace(
-            go.Scatter(
-                x=10 ** xs, y=slope * xs + intercept, mode="lines",
-                line=dict(color="#e2e8f5", dash="dash", width=2),
-                name=f"trend (r = {r:+.2f})", hoverinfo="skip",
-            )
-        )
+        fig.add_trace(go.Scatter(
+            x=10 ** xs, y=slope * xs + intercept, mode="lines",
+            line=dict(color=T["trend"], dash="dash", width=2),
+            name=f"trend (r = {r:+.2f})", hoverinfo="skip",
+        ))
 
     return style(
-        fig,
+        fig, T,
         f"Units built vs. {user_label.lower()} injury rate, by ZIP",
         "affordable units completed in the selection (log scale)",
         f"{user_label} injured per 100 crashes",
     )
 
 
-def fig_tiers(data, injured_col, user_label):
+def fig_tiers(data, injured_col, user_label, T):
     """Bar: injury rate by how much the ZIP-year built."""
     if data.empty:
-        return empty_figure()
+        return empty_figure(T)
     frame = data.copy()
     frame["tier"] = development_tier(frame)
     frame["rate"] = 100 * frame[injured_col] / frame["crashes"].replace(0, np.nan)
@@ -363,74 +326,73 @@ def fig_tiers(data, injured_col, user_label):
         .reindex(TIER_ORDER).dropna(subset=["rate"]).reset_index()
     )
     if grouped.empty:
-        return empty_figure()
+        return empty_figure(T)
 
-    fig = go.Figure(
-        go.Bar(
-            x=grouped["tier"].astype(str), y=grouped["rate"],
-            marker_color=[MUTED if t == "No completions" else HOUSING for t in grouped["tier"]],
-            text=[f"n={int(n)}" for n in grouped["n"]],
-            textposition="outside", textfont=dict(size=10, color=MUTED),
-            hovertemplate="<b>%{x}</b><br>%{y:.1f} injuries per 100 crashes<extra></extra>",
-        )
-    )
+    fig = go.Figure(go.Bar(
+        x=grouped["tier"].astype(str), y=grouped["rate"],
+        marker_color=[T["muted"] if t == "No completions" else T["housing"]
+                      for t in grouped["tier"]],
+        text=[f"n={int(n)}" for n in grouped["n"]],
+        textposition="outside", textfont=dict(size=10, color=T["muted"]),
+        hovertemplate="<b>%{x}</b><br>%{y:.1f} injuries per 100 crashes<extra></extra>",
+    ))
     return style(
-        fig,
+        fig, T,
         f"Does building more go with more harm? ({user_label.lower()})",
         "affordable units completed in the ZIP-year",
         "median injuries per 100 crashes",
     )
 
 
-def fig_trend(data, unit_col, injured_col, band_label, user_label):
-    """Dual-axis line: units completed and injuries, year by year."""
+def fig_trend(data, unit_col, injured_col, band_label, user_label, T):
+    """Dual-axis: units completed and injuries, year by year."""
     if data.empty:
-        return empty_figure()
+        return empty_figure(T)
     yearly = (
         data.groupby("year", as_index=False)
-        .agg(units=(unit_col, "sum"), injured=(injured_col, "sum"), crashes=("crashes", "sum"))
+        .agg(units=(unit_col, "sum"), injured=(injured_col, "sum"))
         .sort_values("year")
     )
     if len(yearly) < 2:
-        return empty_figure("Select at least two years to see a trend.")
+        return empty_figure(T, "Select at least two years to see a trend.")
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=yearly["year"], y=yearly["units"], name=band_label,
-        marker_color=HOUSING, opacity=0.85, yaxis="y",
+        marker_color=T["housing"], opacity=0.85, yaxis="y",
         hovertemplate="<b>%{x}</b><br>%{y:,.0f} units<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
         x=yearly["year"], y=yearly["injured"], name=f"{user_label} injured",
-        mode="lines+markers", line=dict(color=CRASH, width=3), yaxis="y2",
+        mode="lines+markers", line=dict(color=T["crash"], width=3), yaxis="y2",
         hovertemplate="<b>%{x}</b><br>%{y:,.0f} injured<extra></extra>",
     ))
-    fig.update_layout(**PLOTLY_LAYOUT)
+    fig.update_layout(**plotly_layout(T))
     fig.update_layout(
         title_text="Housing completed and people hurt, year by year",
         # extra right margin: this chart carries a second y-axis on that side
         margin=dict(l=62, r=76, t=66, b=92),
-        xaxis=dict(title="year", gridcolor=GRID, dtick=1),
-        # plotly>=6 removed the `titlefont` shortcut: the font lives inside `title`.
-        yaxis=dict(title=dict(text="affordable units", font=dict(color=HOUSING)),
-                   gridcolor=GRID, tickfont=dict(color=HOUSING)),
-        yaxis2=dict(title=dict(text=f"{user_label} injured", font=dict(color=CRASH)),
+        xaxis=dict(title="year", gridcolor=T["grid"], dtick=1),
+        # plotly>=6 removed the `titlefont` shortcut: the font lives in `title`.
+        yaxis=dict(title=dict(text="affordable units", font=dict(color=T["housing"])),
+                   gridcolor=T["grid"], tickfont=dict(color=T["housing"])),
+        yaxis2=dict(title=dict(text=f"{user_label} injured", font=dict(color=T["crash"])),
                     overlaying="y", side="right", showgrid=False,
-                    tickfont=dict(color=CRASH)),
+                    tickfont=dict(color=T["crash"])),
     )
     return fig
 
 
-def fig_boroughs(data, unit_col, injured_col):
+def fig_boroughs(data, unit_col, injured_col, T):
     """Diverging bar: share of injuries minus share of new units."""
     if data.empty:
-        return empty_figure()
+        return empty_figure(T)
     grouped = data.groupby("borough", as_index=False).agg(
         units=(unit_col, "sum"), injured=(injured_col, "sum")
     )
     grouped = grouped[(grouped["units"] > 0) | (grouped["injured"] > 0)]
     if len(grouped) < 2 or grouped["units"].sum() == 0 or grouped["injured"].sum() == 0:
-        return empty_figure("Select at least two boroughs to compare them.")
+        return empty_figure(T, "Select at least two boroughs to compare them.")
 
     grouped["unit_share"] = 100 * grouped["units"] / grouped["units"].sum()
     grouped["injury_share"] = 100 * grouped["injured"] / grouped["injured"].sum()
@@ -439,24 +401,22 @@ def fig_boroughs(data, unit_col, injured_col):
 
     fig = go.Figure(go.Bar(
         x=grouped["gap"], y=[b.title() for b in grouped["borough"]], orientation="h",
-        marker_color=[CRASH if g > 0 else HOUSING for g in grouped["gap"]],
+        marker_color=[T["crash"] if g > 0 else T["housing"] for g in grouped["gap"]],
         customdata=np.stack([grouped["unit_share"], grouped["injury_share"]], axis=-1),
         hovertemplate=("<b>%{y}</b><br>%{customdata[0]:.1f}% of new units<br>"
                        "%{customdata[1]:.1f}% of injuries<extra></extra>"),
     ))
-    fig.add_vline(x=0, line_color="#8894ab", line_width=1)
+    fig.add_vline(x=0, line_color=T["muted"], line_width=1)
     return style(
-        fig,
-        "Which borough absorbs more harm than housing?",
-        "share of injuries minus share of new units (pp)",
-        "",
+        fig, T, "Which borough absorbs more harm than housing?",
+        "share of injuries minus share of new units (pp)", "",
     )
 
 
-def fig_factors(data, factors):
+def fig_factors(data, factors, T):
     """Heatmap: contributing-factor mix by development tier."""
     if data.empty or factors.empty:
-        return empty_figure()
+        return empty_figure(T)
 
     tiers = data.copy()
     tiers["tier"] = development_tier(tiers).astype(str)
@@ -465,28 +425,26 @@ def fig_factors(data, factors):
     joined = factors.join(lookup.rename("tier"), on=["zip_code", "year"]).dropna(subset=["tier"])
     joined = joined[joined["factor"].str.lower() != "unspecified"]
     if joined.empty:
-        return empty_figure("No contributing-factor data for this selection.")
+        return empty_figure(T, "No contributing-factor data for this selection.")
 
     pivot = joined.pivot_table(index="factor", columns="tier", values="crashes", aggfunc="sum")
     pivot = pivot.reindex(columns=[t for t in TIER_ORDER if t in pivot.columns]).fillna(0)
     if pivot.empty or pivot.to_numpy().sum() == 0:
-        return empty_figure("No contributing-factor data for this selection.")
+        return empty_figure(T, "No contributing-factor data for this selection.")
 
     totals = pivot.sum(axis=0).replace(0, np.nan)
     share = (100 * pivot.div(totals, axis=1)).fillna(0)
     share = share.loc[share.mean(axis=1).nlargest(10).index]
 
-    fig = px.imshow(
-        share, color_continuous_scale=SEQ, aspect="auto",
-        labels=dict(color="% of crashes"), text_auto=".1f",
-    )
+    fig = px.imshow(share, color_continuous_scale=T["seq"], aspect="auto",
+                    labels=dict(color="% of crashes"), text_auto=".1f")
     fig.update_traces(
         hovertemplate="<b>%{y}</b><br>%{x}: %{z:.1f}% of that tier's crashes<extra></extra>"
     )
-    fig.update_layout(**PLOTLY_LAYOUT)
+    fig.update_layout(**plotly_layout(T))
     fig.update_layout(
         title_text="Why crashes happen, by how much the ZIP built (each column = 100%)",
-        margin=dict(l=190, r=24, t=64, b=52), height=440,
+        margin=dict(l=190, r=24, t=66, b=56),
         coloraxis_colorbar=dict(title="% of<br>crashes", thickness=12),
     )
     fig.update_xaxes(title_text="affordable units completed in the ZIP-year", side="bottom")
@@ -497,34 +455,38 @@ def fig_factors(data, factors):
 # --------------------------------------------------------------------------
 # Layout helpers
 # --------------------------------------------------------------------------
-def kpi(value, label, color=INK):
+def kpi(value, label, tone="ink"):
     return html.Div(
-        className="kpi",
+        className=f"kpi kpi--{tone}",
         children=[
-            html.Div(value, className="kpi-value", style={"color": color}),
+            html.Div(value, className="kpi-value"),
             html.Div(label, className="kpi-label"),
         ],
     )
 
 
-def card(graph_id, note=None, height=430):
-    """A chart in a panel.
+def card(graph_id, note=None, size="std"):
+    """A chart panel.
 
-    The height has to be set in CSS, not only in the figure layout: with
-    `responsive: True` Plotly sizes the plot to its container and ignores
-    `layout.height`, and a CSS grid cell has no intrinsic height, so the chart
-    would collapse to a few pixels.
+    Height comes from CSS (`.chart--*`) rather than an inline pixel value, so
+    the charts scale fluidly with the viewport. Plotly's `responsive` mode
+    fills whatever box CSS gives it.
     """
     children = [
-        dcc.Graph(
-            id=graph_id,
-            config={"displayModeBar": False, "responsive": True},
-            style={"height": f"{height}px", "width": "100%"},
+        html.Div(
+            className=f"chart-box chart-box--{size}",
+            children=[
+                dcc.Graph(
+                    id=graph_id,
+                    className="chart",
+                    config={"displayModeBar": False, "responsive": True},
+                )
+            ],
         )
     ]
     if note:
         children.append(html.P(note, className="chart-note"))
-    return html.Div(className="card", children=children)
+    return html.Div(className=f"card card--{size}", children=children)
 
 
 def dropdown(component_id, label, options, value, multi=False):
@@ -532,10 +494,8 @@ def dropdown(component_id, label, options, value, multi=False):
         className="control",
         children=[
             html.Label(label, htmlFor=component_id),
-            dcc.Dropdown(
-                id=component_id, options=options, value=value, multi=multi,
-                clearable=multi, placeholder="All",
-            ),
+            dcc.Dropdown(id=component_id, options=options, value=value, multi=multi,
+                         clearable=multi, placeholder="All"),
         ],
     )
 
@@ -549,16 +509,52 @@ app = Dash(
     update_title=None,
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
-server = app.server  # gunicorn entry point: `gunicorn app:server`
+server = app.server  # gunicorn / WSGI entry point
+
+# Set the initial theme on <html> before first paint so the page never flashes
+# the wrong colours, and honour the visitor's OS preference on first visit.
+app.index_string = """<!DOCTYPE html>
+<html data-theme="dark">
+  <head>
+    {%metas%}<title>{%title%}</title>{%favicon%}{%css%}
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('nyc-theme');
+          var prefersLight = window.matchMedia
+            && window.matchMedia('(prefers-color-scheme: light)').matches;
+          var theme = saved || (prefersLight ? 'light' : 'dark');
+          document.documentElement.setAttribute('data-theme', theme);
+          window.__initialTheme = theme;
+        } catch (e) { /* private mode: fall back to the dark default */ }
+      })();
+    </script>
+  </head>
+  <body>
+    {%app_entry%}
+    <footer>{%config%}{%scripts%}{%renderer%}</footer>
+  </body>
+</html>"""
 
 app.layout = html.Div(
     className="page",
     children=[
+        dcc.Store(id="theme", data="dark", storage_type="local"),
+
         html.Header(
             className="hero",
             children=[
-                html.P("NYC Open Data · Housing & Development × Transportation",
-                       className="eyebrow"),
+                html.Div(
+                    className="hero-top",
+                    children=[
+                        html.P("NYC Open Data · Housing & Development × Transportation",
+                               className="eyebrow"),
+                        html.Button("☾", id="theme-toggle", n_clicks=0,
+                                    className="theme-toggle",
+                                    title="Switch between light and dark",
+                                    **{"aria-label": "Switch colour theme"}),
+                    ],
+                ),
                 html.H1([
                     "Does New York build affordable housing on its ",
                     html.Em("most dangerous"),
@@ -631,18 +627,18 @@ app.layout = html.Div(
         html.Section(
             className="grid",
             children=[
-                html.Div(className="span-2", children=[
-                    card("map", "Circles are ZIP codes, sized by crash volume and coloured by "
-                                "injury rate; blue dots are individual affordable buildings. "
-                                "Drag to pan, scroll to zoom.", height=520)]),
-                card("scatter", "Each point is one ZIP code. The dashed line is a least-squares "
-                                "fit — it describes the pattern, it does not explain it."),
+                card("map", "Large circles are ZIP codes, sized by crash volume and coloured "
+                            "by injury rate; the small dots are individual affordable "
+                            "buildings. Drag to pan, scroll to zoom.", size="wide"),
+                card("scatter", "Each point is one ZIP code. The dashed line is a "
+                                "least-squares fit — it describes the pattern, it does not "
+                                "explain it."),
                 card("tiers", "ZIP-years split into quartiles by units completed, plus those "
                               "that completed nothing as a comparison group."),
                 card("trend", "Bars read against the left axis, the line against the right."),
-                card("boroughs", "Positive means the borough carries a larger share of injuries "
-                                 "than of new affordable units."),
-                html.Div(className="span-2", children=[card("factors", height=460)]),
+                card("boroughs", "Positive means the borough carries a larger share of "
+                                 "injuries than of new affordable units."),
+                card("factors", size="wide"),
             ],
         ),
 
@@ -656,13 +652,14 @@ app.layout = html.Div(
                         html.Div([
                             html.H3("The question"),
                             html.P(
-                                "New York publishes, building by building, every affordable home "
-                                "it finances, and crash by crash, every collision its police "
-                                "attend. The two are almost never read together. They should be: "
-                                "a household that moves into a subsidised unit does not get to "
-                                "choose the traffic outside it. If the city systematically places "
-                                "below-market housing on its most hostile streets, then the people "
-                                "with the least housing choice absorb the most street risk."
+                                "New York publishes, building by building, every affordable "
+                                "home it finances, and crash by crash, every collision its "
+                                "police attend. The two are almost never read together. They "
+                                "should be: a household that moves into a subsidised unit does "
+                                "not get to choose the traffic outside it. If the city "
+                                "systematically places below-market housing on its most hostile "
+                                "streets, then the people with the least housing choice absorb "
+                                "the most street risk."
                             ),
                         ]),
                         html.Div([
@@ -702,46 +699,48 @@ app.layout = html.Div(
                                 "completed none — 13.4 to 14.9 against 9.7 per 100 crashes — "
                                 "but the four building quartiles are flat against each other, "
                                 "so building more does not go with more harm. Tracked around "
-                                "each ZIP's largest completion wave, injuries simply follow "
-                                "the borough trend, and the depth of a project's affordability "
+                                "each ZIP's largest completion wave, injuries simply follow the "
+                                "borough trend, and the depth of a project's affordability "
                                 "predicts street risk not at all (r = −0.03).",
                                 style={"marginTop": "10px"},
                             ),
                             html.P(
                                 "The surprise is that the largest projects sit on the safest "
-                                "streets: Co-op City absorbed 15,531 units at an injury rate "
-                                "of 9.3, while East Harlem's 6,629 units sit at 17.1. Big "
-                                "schemes need big parcels, and big parcels have few "
-                                "intersections. What is left is a coordination problem, not a "
-                                "causal harm — housing goes where land is, danger is where "
-                                "the traffic is, and in New York those are different places.",
+                                "streets: Co-op City absorbed 15,531 units at an injury rate of "
+                                "9.3, while East Harlem's 6,629 units sit at 17.1. Big schemes "
+                                "need big parcels, and big parcels have few intersections. What "
+                                "is left is a coordination problem, not a causal harm — housing "
+                                "goes where land is, danger is where the traffic is, and in New "
+                                "York those are different places.",
                                 style={"marginTop": "10px"},
                             ),
-                        ], className="span-2"),
+                        ], className="span-all"),
                         html.Div([
                             html.H3("The limits"),
                             html.P(
-                                "None of this is causal. Affordable housing is sited deliberately: "
-                                "on cheaper land, in denser places, along commercial corridors. "
-                                "Every one of those factors independently predicts street danger, "
-                                "and we cannot separate them. A third of crash records carry no "
-                                "ZIP code — disproportionately highway collisions — and had to be "
-                                "dropped, so this is a picture of the surface street grid. ZIP "
-                                "codes are postal routes, not neighbourhoods. And we have no "
-                                "exposure denominator, which is why every rate here is per 100 "
-                                "crashes rather than per resident."
+                                "None of this is causal. Affordable housing is sited "
+                                "deliberately: on cheaper land, in denser places, along "
+                                "commercial corridors. Every one of those factors independently "
+                                "predicts street danger, and we cannot separate them. A third "
+                                "of crash records carry no ZIP code — disproportionately "
+                                "highway collisions — and had to be dropped, so this is a "
+                                "picture of the surface street grid. ZIP codes are postal "
+                                "routes, not neighbourhoods. And we have no exposure "
+                                "denominator, which is why every rate here is per 100 crashes "
+                                "rather than per resident."
                             ),
                         ]),
                         html.Div([
                             html.H3("Why it matters"),
                             html.P(
-                                "HPD and City Planning already publish street-safety metrics per "
-                                "ZIP; they could sit in the siting scorecard beside land cost and "
-                                "zoning, so that a high-risk location is knowable at the moment of "
-                                "decision rather than afterwards. DOT's Vision Zero map is built "
-                                "from crash history — adding pipeline affordable units would make "
-                                "it forward-looking, treating a street before a thousand new "
-                                "households arrive instead of after."
+                                "HPD and City Planning already publish street-safety metrics "
+                                "per ZIP; they could sit in the siting scorecard beside land "
+                                "cost and zoning, so that a high-risk location is knowable at "
+                                "the moment of decision rather than afterwards. DOT's Vision "
+                                "Zero map is built from crash history — adding pipeline "
+                                "affordable units would make it forward-looking, treating a "
+                                "street before a thousand new households arrive instead of "
+                                "after."
                             ),
                         ]),
                     ],
@@ -766,6 +765,25 @@ app.layout = html.Div(
 # --------------------------------------------------------------------------
 # Callbacks
 # --------------------------------------------------------------------------
+# Theme toggle runs in the browser: it flips the attribute CSS keys off and
+# remembers the choice, with no server round trip for the page chrome.
+app.clientside_callback(
+    """
+    function (n_clicks, current) {
+        var theme = current || window.__initialTheme || 'dark';
+        if (n_clicks) { theme = (theme === 'dark') ? 'light' : 'dark'; }
+        document.documentElement.setAttribute('data-theme', theme);
+        try { localStorage.setItem('nyc-theme', theme); } catch (e) {}
+        return [theme, theme === 'dark' ? '\\u263E' : '\\u2600'];
+    }
+    """,
+    Output("theme", "data"),
+    Output("theme-toggle", "children"),
+    Input("theme-toggle", "n_clicks"),
+    State("theme", "data"),
+)
+
+
 @app.callback(
     Output("borough", "value"),
     Output("year", "value"),
@@ -782,12 +800,12 @@ app.layout = html.Div(
 )
 def search_to_filters(_clicks, _submits, query, boroughs, years, band, user):
     """Search mode: parse the text box into the dropdowns above."""
-    parsed_boroughs, parsed_years, parsed_band, parsed_user = parse_search(query)
+    p_boroughs, p_years, p_band, p_user = parse_search(query)
     return (
-        parsed_boroughs if parsed_boroughs is not None else boroughs,
-        parsed_years if parsed_years is not None else years,
-        parsed_band or band,
-        parsed_user or user,
+        p_boroughs if p_boroughs is not None else boroughs,
+        p_years if p_years is not None else years,
+        p_band or band,
+        p_user or user,
     )
 
 
@@ -801,13 +819,21 @@ def search_to_filters(_clicks, _submits, query, boroughs, years, band, user):
     Output("boroughs", "figure"),
     Output("factors", "figure"),
     Input("generate", "n_clicks"),
+    Input("theme", "data"),
     State("borough", "value"),
     State("year", "value"),
     State("band", "value"),
     State("user", "value"),
 )
-def generate_report(_clicks, boroughs, years, band, user):
-    """The single report callback. Dropdowns are State; only the button redraws."""
+def generate_report(_clicks, theme_name, boroughs, years, band, user):
+    """The report callback.
+
+    `generate` is the Input that applies the filters — they are State, so
+    nothing redraws until the button is pressed. `theme` is a second Input
+    only because the figures are rendered server-side and must be re-rendered
+    in the other palette when the viewer switches.
+    """
+    T = get_theme(theme_name)
     band = band or "All affordable units"
     user = user or "Pedestrians & cyclists"
     unit_col = INCOME_BANDS[band]
@@ -818,11 +844,9 @@ def generate_report(_clicks, boroughs, years, band, user):
     factors = apply_filters(FACTORS, boroughs, years)
 
     if data.empty:
-        blank = empty_figure()
-        return (
-            [kpi("—", "no data")], "No ZIP-years match these filters.",
-            blank, blank, blank, blank, blank, blank,
-        )
+        blank = empty_figure(T)
+        return ([kpi("—", "no data")], "No ZIP-years match these filters.",
+                blank, blank, blank, blank, blank, blank)
 
     units = float(data[unit_col].sum())
     crashes = float(data["crashes"].sum())
@@ -831,19 +855,18 @@ def generate_report(_clicks, boroughs, years, band, user):
     rate = (100 * injured / crashes) if crashes else 0.0
 
     cards = [
-        kpi(f"{units:,.0f}", f"{band.lower()} completed", HOUSING),
-        kpi(f"{data['buildings_completed'].sum():,.0f}", "buildings completed", HOUSING),
-        kpi(f"{crashes:,.0f}", "crashes recorded", CRASH),
-        kpi(f"{injured:,.0f}", f"{user.lower()} injured", CRASH),
-        kpi(f"{killed:,.0f}", f"{user.lower()} killed", CRASH),
-        kpi(f"{rate:.1f}", "injured per 100 crashes", INK),
+        kpi(f"{units:,.0f}", f"{band.lower()} completed", "housing"),
+        kpi(f"{data['buildings_completed'].sum():,.0f}", "buildings completed", "housing"),
+        kpi(f"{crashes:,.0f}", "crashes recorded", "crash"),
+        kpi(f"{injured:,.0f}", f"{user.lower()} injured", "crash"),
+        kpi(f"{killed:,.0f}", f"{user.lower()} killed", "crash"),
+        kpi(f"{rate:.1f}", "injured per 100 crashes", "ink"),
     ]
 
     boro_text = ", ".join(b.title() for b in boroughs) if boroughs else "all five boroughs"
     if years:
-        sorted_years = sorted(int(y) for y in years)
-        year_text = (f"{sorted_years[0]}–{sorted_years[-1]}"
-                     if len(sorted_years) > 1 else str(sorted_years[0]))
+        ys = sorted(int(y) for y in years)
+        year_text = f"{ys[0]}–{ys[-1]}" if len(ys) > 1 else str(ys[0])
     else:
         year_text = f"{min(YEARS)}–{max(YEARS)}"
     summary = (f"Showing {boro_text}, {year_text} · {band} · {user} · "
@@ -852,12 +875,12 @@ def generate_report(_clicks, boroughs, years, band, user):
     return (
         cards,
         summary,
-        fig_map(data, points, injured_col),
-        fig_scatter(data, unit_col, injured_col, band, user),
-        fig_tiers(data, injured_col, user),
-        fig_trend(data, unit_col, injured_col, band, user),
-        fig_boroughs(data, unit_col, injured_col),
-        fig_factors(data, factors),
+        fig_map(data, points, injured_col, T),
+        fig_scatter(data, unit_col, injured_col, band, user, T),
+        fig_tiers(data, injured_col, user, T),
+        fig_trend(data, unit_col, injured_col, band, user, T),
+        fig_boroughs(data, unit_col, injured_col, T),
+        fig_factors(data, factors, T),
     )
 
 
