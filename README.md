@@ -6,7 +6,7 @@ Dr. Nada Sharaf · TA. Mariam Ali · TA. May Magdy · TA. Mohamed El dagla
 
 | | |
 |---|---|
-| **Live website** | _<add the Render URL here once deployed>_ |
+| **Live website** | **<https://nyc-housing-transit-rho.vercel.app>** |
 | **Notebook** | [`Milestone1_Housing_Transit.ipynb`](Milestone1_Housing_Transit.ipynb) |
 | **Prompt log** | [`PROMPT_LOG.md`](PROMPT_LOG.md) |
 

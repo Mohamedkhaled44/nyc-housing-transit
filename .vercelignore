@@ -1,0 +1,14 @@
+# Vercel does not honour .gitignore, so the raw downloads must be excluded here
+# too or the upload exceeds the 100 MB file limit (crashes_raw.csv alone is
+# ~250 MB). Only the app and its small pre-aggregated data are needed at runtime.
+data/raw/
+
+# Analysis-side files: used to produce data/processed/, not to serve it.
+*.ipynb
+build_notebook.py
+download_data.py
+render.yaml
+Procfile
+PROMPT_LOG.md
+README.md
+.git
