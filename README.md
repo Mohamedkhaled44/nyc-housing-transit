@@ -206,17 +206,17 @@ Ten questions, two per team member, each with one chart.
 
 ## Team contributions
 
-> **To be completed before submission.** Replace each placeholder with the
-> member's name and university ID, and adjust the task lists to match what each
-> person actually did.
+> Student IDs are deliberately **not** published here — they go in the submission
+> email only. Adjust the task lists below so they match what each person
+> actually did.
 
-| Member | Name | ID | Contribution |
-|---|---|---|---|
-| Member 1 | _name_ | _id_ | RQ1, RQ2 and their charts; housing-side pre-integration cleaning (ZIP standardisation, completion-date fallback rule); KPI row on the website |
-| Member 2 | _name_ | _id_ | RQ3, RQ4 and their charts; crash-side pre-integration cleaning (ZIP/borough recovery, coordinate validation); trend chart on the website |
-| Member 3 | _name_ | _id_ | RQ5, RQ6 and their charts; dataset integration (aggregation to ZIP × year, join-type selection); scatter chart on the website |
-| Member 4 | _name_ | _id_ | RQ7, RQ8 and their charts; post-integration cleaning (join nulls, redundant columns, dtypes); map and borough charts on the website |
-| Member 5 | _name_ | _id_ | RQ9, RQ10 and their charts; exploratory data analysis and validation plots; heatmap, search mode and Generate Report wiring |
+| Member | Name | Contribution |
+|---|---|---|
+| 1 | Mohamed Tarek Borham | RQ1, RQ2 and their charts; housing-side pre-integration cleaning (ZIP standardisation, completion-date fallback rule); KPI row on the website |
+| 2 | Mohamed Khaled Mohamed Mohamed Ismail | RQ3, RQ4 and their charts; crash-side pre-integration cleaning (ZIP/borough recovery, coordinate validation); data download and paging; repository and deployment |
+| 3 | Norhan Mohamed Ahmed Nabeih Abdelghany Hameed | RQ5, RQ6 and their charts; dataset integration (aggregation to ZIP × year, join-type selection); scatter and trend charts on the website |
+| 4 | Mina Ayman Andrawes Bekhet Andrawes | RQ7, RQ8 and their charts; post-integration cleaning (join nulls, redundant columns, dtypes); map and borough charts on the website |
+| 5 | Noureldin Ashraf Mohamed Hassan Abdo | RQ9, RQ10 and their charts; exploratory data analysis and validation plots; heatmap, search mode and Generate Report wiring |
 
 ---
 
