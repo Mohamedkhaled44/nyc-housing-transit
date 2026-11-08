@@ -7,11 +7,15 @@ recorded. This file is that record.
 the two datasets against the NYC Open Data API, drafting the download script,
 the cleaning and integration notebook, and the Dash website.
 
-**Where it was not:** every analytical decision in the notebook — the choice of
-join key, the join type, each drop-versus-impute call, the treatment of outliers
-— is argued in the notebook's own markdown cells against evidence printed in the
-cell above it. All figures were produced by executing that code against the live
-data, not described from memory.
+**How the output was verified:** the analytical decisions — the choice of join
+key, the join type, each drop-versus-impute call, the treatment of outliers —
+were proposed by the assistant and are argued in the notebook's own markdown
+cells against evidence printed in the cell directly above each one, so that any
+reader can check the reasoning against the numbers rather than taking it on
+trust. Every figure and every statistic quoted in the notebook, the README and
+the website was produced by executing that code against the live data; nothing
+is quoted from memory. Where a stated number and the executed output disagreed,
+the prose was corrected to match the output.
 
 ---
 

@@ -1,0 +1,12 @@
+# Render blueprint. On render.com choose New > Blueprint and point it at this
+# repository, or configure a Web Service by hand with the same three settings.
+services:
+  - type: web
+    name: nyc-housing-transit
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:server
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.3

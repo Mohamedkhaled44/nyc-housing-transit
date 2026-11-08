@@ -548,10 +548,11 @@ app.layout = html.Div(
                 html.H1("Does New York build affordable housing on its most dangerous streets?"),
                 html.P(
                     "An affordable apartment is not only a rent number — it is a front door "
-                    "that opens onto a particular street. We joined every HPD-financed "
-                    "building completed between 2018 and 2025 to 1.04 million police-reported "
-                    "collisions, at the level of ZIP code and year, to ask what kind of street "
-                    "the city's below-market housing actually opens onto.",
+                    "that opens onto a particular street. We took 1.04 million police-reported "
+                    "collisions from 2018 to 2025, kept the 699,962 that carry a ZIP code, and "
+                    "joined them to the 4,392 HPD-financed buildings completed in the same "
+                    "years, at the level of ZIP code and year — to ask what kind of street the "
+                    "city's below-market housing actually opens onto.",
                     className="standfirst",
                 ),
             ],
@@ -665,6 +666,40 @@ app.layout = html.Div(
                                 "joined there.",
                             ]),
                         ]),
+                        html.Div([
+                            html.H3("What we found"),
+                            html.P([
+                                "The premise turned out to be wrong in the direction we "
+                                "expected it to be right. ",
+                                html.B("Queens carries 23.1% of the city's pedestrian and "
+                                       "cyclist injuries but receives 13.3% of its new "
+                                       "affordable units"),
+                                "; the Bronx is the mirror image, taking 31.7% of the units "
+                                "while accounting for 15.4% of the injuries. The borough "
+                                "building the most has comparatively safe streets.",
+                            ]),
+                            html.P(
+                                "ZIP-years that completed any affordable housing do show a "
+                                "higher pedestrian-and-cyclist injury rate than those that "
+                                "completed none — 13.4 to 14.9 against 9.7 per 100 crashes — "
+                                "but the four building quartiles are flat against each other, "
+                                "so building more does not go with more harm. Tracked around "
+                                "each ZIP's largest completion wave, injuries simply follow "
+                                "the borough trend, and the depth of a project's affordability "
+                                "predicts street risk not at all (r = −0.03).",
+                                style={"marginTop": "10px"},
+                            ),
+                            html.P(
+                                "The surprise is that the largest projects sit on the safest "
+                                "streets: Co-op City absorbed 15,531 units at an injury rate "
+                                "of 9.3, while East Harlem's 6,629 units sit at 17.1. Big "
+                                "schemes need big parcels, and big parcels have few "
+                                "intersections. What is left is a coordination problem, not a "
+                                "causal harm — housing goes where land is, danger is where "
+                                "the traffic is, and in New York those are different places.",
+                                style={"marginTop": "10px"},
+                            ),
+                        ], className="span-2"),
                         html.Div([
                             html.H3("The limits"),
                             html.P(

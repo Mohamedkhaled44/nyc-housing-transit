@@ -18,9 +18,11 @@ New York City publishes, building by building, every affordable home it helps
 finance, and crash by crash, every collision its police attend. The two are
 almost never read together. They should be: a household that moves into a
 subsidised unit does not get to choose the traffic outside its front door. We
-joined **9,551 HPD-financed building records** to **1.04 million police-reported
-collisions** at the level of **ZIP code × year**, and asked what kind of street
-environment the city's below-market housing actually opens onto.
+took **1.04 million police-reported collisions** from 2018–2025, kept the
+**699,962** that carry a ZIP code, and joined them to the **4,392 HPD-financed
+buildings** completed in the same years, at the level of **ZIP code × year** —
+then asked what kind of street environment the city's below-market housing
+actually opens onto.
 
 ---
 
@@ -51,12 +53,37 @@ calendar year** and joined there.
 A ZIP code in NYC holds roughly 20,000–100,000 people, which is close to a
 neighbourhood: the scale at which housing siting and street design are actually
 decided. A year smooths crash seasonality while still leaving eight observations
-per ZIP. ~180 ZIPs × 8 years gives ~1,400 cells.
+per ZIP. In the event this gives **228 ZIP codes and 1,677 ZIP-year cells**.
 
 The **crash table is the spine** of an outer join. A ZIP-year that completed no
 affordable housing is a real observation of "built nothing" — it becomes a zero,
 not a null — and it is precisely the comparison group the analysis needs. An
 inner join would have deleted it. Full reasoning is in notebook section 4.3.
+
+---
+
+## What we found
+
+**The premise turned out to be wrong in the direction we expected it to be
+right.** Queens carries **23.1%** of the city's pedestrian and cyclist injuries
+while receiving **13.3%** of its new affordable units; the Bronx is the mirror
+image, taking **31.7%** of the units while accounting for **15.4%** of the
+injuries. The borough building the most has comparatively safe streets.
+
+| Finding | Evidence |
+|---|---|
+| Building *at all* separates the groups; building *more* does not | no-completion ZIP-years sit at 9.7 pedestrian/cyclist injuries per 100 crashes, the four building quartiles at 13.4, 13.6, 14.9, 14.6 — flat against each other (RQ1) |
+| No local effect around a completion wave | injuries track the borough's own trend in the three years either side of each ZIP's peak year (RQ3) |
+| Depth of affordability predicts street risk not at all | r = −0.03 across 628 ZIP-years (RQ5) |
+| The biggest projects sit on the safest streets | Co-op City: 15,531 units at an injury rate of 9.3; East Harlem: 6,629 units at 17.1 (RQ7) |
+| Injury and death point opposite ways | high-building ZIPs injure more pedestrians per crash but kill slightly fewer (r = −0.10, RQ10) |
+
+The cross-sectional gap in RQ1 is best read as **composition, not effect**: 531
+of the 956 no-completion ZIP-years belong to 84 ZIP codes that never built at
+all over eight years — lower-density, more car-dependent places whose crashes
+injure motorists rather than pedestrians. The defensible claim is geographic
+and narrow: **housing goes where land is available, street danger is where the
+traffic is, and in New York those are substantially different places.**
 
 ---
 
@@ -76,6 +103,7 @@ inner join would have deleted it. Full reasoning is in notebook section 4.3.
 │       ├── housing_points.csv         # building-level points for the map
 │       └── crash_factors.csv          # contributing factors per ZIP-year
 ├── requirements.txt
+├── render.yaml                        # one-click Render blueprint
 ├── Procfile / .python-version         # deployment configuration
 └── PROMPT_LOG.md                      # required log of every LLM prompt used
 ```
@@ -125,6 +153,14 @@ Running the notebook top to bottom rewrites the three files in
    - **Start command**: `gunicorn app:server`
    - **Instance type**: Free
 4. Deploy. The first build takes 2–4 minutes.
+
+Alternatively, choose **New → Blueprint** and point Render at this repository:
+`render.yaml` already carries all three settings.
+
+**Note on the free tier:** a free Render instance sleeps after about 15 minutes
+of inactivity and takes roughly 50 seconds to wake. The first page load after a
+quiet period is therefore slow — this is Render, not the app. Reload once and
+it is immediate.
 
 `.python-version` pins Python 3.13.3. If the build log reports that version as
 unavailable, change the file to `3.12` and redeploy. `gunicorn` does not run on

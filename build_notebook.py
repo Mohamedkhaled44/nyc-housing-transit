@@ -383,14 +383,14 @@ print(f"largest building in the data   : {positive_units.max():,.0f} units")
 """)
 
 md(r"""
-**On those "outliers".** The Tukey fence flags several hundred buildings as high
-outliers, and the largest building has well over a thousand units. These are
-**not** data errors — large affordable towers genuinely exist, and deleting them
-would delete most of the affordable housing in the dataset, which is precisely
-what we are trying to measure. We therefore **keep** them and handle their
-leverage statistically instead (section 3.1): we log-scale axes where the skew
-hurts readability, and we use medians and quartiles rather than means wherever a
-single tower could swing a borough's number.
+**On those "outliers".** The Tukey fence sits at 108 units and flags **1,171
+buildings** as high outliers; the largest building in the data has **1,320
+units**. These are **not** data errors — large affordable developments genuinely
+exist, and deleting them would delete most of the affordable housing in the
+dataset, which is precisely what we are trying to measure. We therefore **keep**
+them and handle their leverage statistically instead: we log-scale axes where
+the skew hurts readability, and we use medians and quartiles rather than means
+wherever a single large project could swing a borough's number.
 
 The outlier rule we *do* apply is a domain rule, not a statistical one:
 `total_units <= 0` is impossible for a building that was produced.
@@ -517,7 +517,7 @@ rather than the alternative**.
 |---|---|---|---|
 | 1 | `postcode` is a float (`10001.0`) | cast to a 5-character zero-padded **string** | ZIP is a label, not a quantity; leaving it numeric breaks the join against the crash side and lets pandas average it |
 | 2 | `borough` casing/whitespace varies | upper-case and strip | a join on `"Brooklyn"` vs `"BROOKLYN"` silently drops rows |
-| 3 | `building_completion_date` missing for unfinished projects | use `building_completion_date`, **fall back** to `project_completion_date`, then drop what remains undated | dropping all of them would discard ~19% of buildings; imputing a date outright would invent facts. The fallback uses a real, published date from the same row |
+| 3 | `building_completion_date` missing for unfinished projects | use `building_completion_date`, **fall back** to `project_completion_date`, then drop what remains undated | imputing a date outright would invent facts, so the fallback uses a real published date from the same row. In the event it rescues only 13 rows and 1,653 remain undated — these are financed-but-unbuilt projects, and a building that does not exist yet has no street to open onto, so dropping them is correct rather than merely convenient |
 | 4 | `CONFIDENTIAL` projects have no ZIP or coordinates | **drop**, and report the count and units lost | they cannot be assigned to any ZIP, so no imputation is defensible. Assigning them to a borough-modal ZIP would fabricate geography |
 | 5 | `total_units <= 0` | drop (domain rule) | a produced building with zero units is a data error, not a small building |
 | 6 | large towers flagged by the Tukey fence | **keep**; use medians/quartiles and log scales | they are the real subject of the study; removing them removes the phenomenon |
@@ -704,20 +704,31 @@ print(f"blanked {int(bad.sum()):,} impossible coordinate pairs (rows kept — ZI
 for col in injury_cols:
     crashes[col] = pd.to_numeric(crashes[col], errors="coerce").fillna(0).astype("int32")
 
-extreme = crashes["number_of_persons_injured"] > 50
-print(f"crashes with >50 people injured: {int(extreme.sum())}")
-if extreme.any():
-    display(crashes.loc[extreme, ["crash_date", "borough", "zip_code",
-                                  "number_of_persons_injured", "vehicle_type_code1"]].head())
+injured = crashes["number_of_persons_injured"]
+lo, hi = iqr_bounds(injured)
+print(f"Tukey fence on persons_injured : [{lo:.1f}, {hi:.1f}]")
+print(f"crashes above that fence       : {int((injured > hi).sum()):,} "
+      f"({100 * (injured > hi).mean():.1f}% of all crashes)")
+print(f"crashes with >20 people injured: {int((injured > 20).sum())}")
+print(f"crashes with >50 people injured: {int((injured > 50).sum())}")
+print(f"worst single crash             : {int(injured.max())} injured")
 """)
 
 md(r"""
-The handful of very high casualty counts are bus and multi-vehicle incidents.
-They are real events, they are exactly the severe outcomes a street-safety
-analysis exists to capture, and an IQR fence would delete every one of them. We
-**keep** them. This is the second place where a statistical outlier rule would
-have actively damaged the analysis, and it is worth saying out loud: *an outlier
-test is a question, not an instruction.*
+**This is where a blind outlier rule would have done real damage.** The Tukey
+fence on `persons_injured` sits at **2.5**, because three quarters of crashes
+injure nobody at all. Applying it mechanically would classify *every crash that
+hurt three or more people* as an outlier and delete it — that is, it would
+delete precisely the severe collisions a street-safety analysis exists to
+measure.
+
+We therefore apply **no statistical outlier rule to the casualty columns**. The
+domain check we do run — a scan for implausibly large counts — returns **zero**
+crashes above 50 injured, and only 4 above 20, with a worst case of 34. Nothing
+here is a data-entry error, so nothing is removed.
+
+The general point is worth stating once: *an outlier test is a question, not an
+instruction.* It told us where to look; the domain decided what to do.
 """)
 
 code(r"""
@@ -772,8 +783,8 @@ keys, and why we landed where we did:
 20,000–100,000 people — close to a neighbourhood, which is the scale at which
 both housing siting and street design are actually decided. A year smooths the
 strong seasonality in crashes while still giving us eight observations per ZIP.
-With roughly 180 ZIPs × 8 years we get ~1,400 cells, enough to look at
-distributions rather than anecdotes.
+In the event this yields **228 ZIP codes and 1,677 ZIP-year cells**, enough to
+look at distributions rather than anecdotes.
 
 **We deliberately do not perform a row-level join.** Matching an individual
 crash to an individual building would imply a relationship the data cannot
@@ -1101,6 +1112,27 @@ rq1
 ''')
 
 md(r"""
+### What RQ1 shows
+
+A clear gap, but not the shape we expected.
+
+* ZIP-years that completed **no** affordable housing: median **9.7**
+  pedestrian-and-cyclist injuries per 100 crashes (n = 956).
+* ZIP-years that completed **any**: **13.4, 13.6, 14.9, 14.6** across the four
+  quartiles (n ≈ 180 each).
+
+So the difference is **binary, not a dose–response**. Building a lot is barely
+different from building a little; *building at all* is what separates the
+groups. A causal story in which construction makes streets more dangerous would
+predict a rising gradient across Q1 → Q4, and there is none.
+
+The more plausible reading is **composition**: 531 of the 956 no-completion
+ZIP-years belong to 84 ZIP codes that never completed a single affordable unit
+between 2018 and 2025. Those tend to be lower-density, more car-oriented parts
+of the city where a larger share of crash injuries are motorists. The contrast
+is largely *between different kinds of neighbourhood*, not between the same
+neighbourhood before and after it builds. RQ3 tests that directly.
+
 ## RQ2 — *Member 1*
 ### Is that gap widening or closing over time?
 
@@ -1134,6 +1166,22 @@ plt.show()
 """)
 
 md(r"""
+### What RQ2 shows
+
+The gap is **narrowing, and it is noisy**. In 2018 top-quartile builders sat
+12.8 percentage points above the no-completion group on pedestrian-and-cyclist
+share of injuries; by 2025 that was 1.6 points, and in 2023 it inverted
+to −3.6.
+
+Two things to say honestly about this. First, with roughly 180 ZIP-years in the
+top quartile spread over eight years, a single year's median moves easily — the
+inversion in 2023 is well inside the noise. Second, the 2020 spike (13.7) is
+almost certainly an artefact of the pandemic rather than a housing story:
+motor traffic collapsed while walking and cycling did not, so pedestrians and
+cyclists became a larger *share* of a much smaller total.
+
+The trend is real enough to report, not strong enough to extrapolate.
+
 ## RQ3 — *Member 2*
 ### After a ZIP's biggest wave of completions, how do injuries move relative to its borough?
 
@@ -1195,9 +1243,27 @@ ax.set_xlabel("years relative to peak completion year")
 ax.set_ylabel("injuries, indexed")
 ax.legend(frameon=False, fontsize=9)
 plt.show()
+
+print(pd.DataFrame({"ZIPs with a wave": rq3.round(1),
+                    "borough control": rq3_ctrl.round(1)}).to_string())
 """)
 
 md(r"""
+### What RQ3 shows
+
+The two lines move together. Whatever happens to injuries around a big
+completion wave is, to the resolution this data supports, **what was happening
+to the whole borough anyway**. The event-study framing was designed to catch a
+local shock and it does not find one.
+
+That is a useful negative result, and it is the reason RQ1's cross-sectional
+gap should not be read as an effect of building: if completions drove street
+harm upward, this is the chart where it would appear, and it does not.
+
+Two honest caveats. The window is short — at most three years either side
+inside a 2018–2025 slice — and 2020 sits inside almost every window, so the
+pandemic's traffic collapse is folded into both lines.
+
 ## RQ4 — *Member 2*
 ### Do big completion years behave differently from small ones?
 
@@ -1229,6 +1295,19 @@ analysis.groupby("dev_tier", observed=True)["vru_injuries_per_100_crashes"].desc
 """)
 
 md(r"""
+### What RQ4 shows
+
+The box plot explains why RQ1's bar chart overstates its own case. The
+**spreads overlap almost completely**: the no-completion group runs from an
+interquartile range of 4.9 to 15.9, and the top quartile from 10.8 to 18.0.
+The medians differ, but a randomly chosen ZIP-year from one group tells you
+very little about which group it came from.
+
+What has actually shifted is the **bottom** of the distribution. Builders have
+almost no ZIP-years at the very low end — a floor rather than a ceiling effect.
+Affordable housing goes into places that already have pedestrian activity, and
+such places do not produce near-zero pedestrian injury rates.
+
 ## RQ5 — *Member 3*
 ### Does the *depth* of affordability track street risk?
 
@@ -1262,9 +1341,30 @@ ax.set_xlabel("% of new units for extremely-low / very-low income households")
 ax.set_ylabel("pedestrian + cyclist injuries per 100 crashes")
 ax.legend(frameon=False, fontsize=8, ncol=2)
 plt.show()
+
+print(f"n = {len(valid)} ZIP-years | slope = {slope:+.3f} pts per pp | r = {r:+.3f}")
 """)
 
 md(r"""
+### What RQ5 shows
+
+**Nothing — and that is the finding.** r = −0.03 across 628 ZIP-years, with a
+slope indistinguishable from flat. The depth of a project's affordability
+carries **no** relationship to the street risk of the ZIP it lands in.
+
+This matters because it is the equity question at its sharpest. The worry worth
+testing was that the deepest-subsidy housing — the homes for extremely-low and
+very-low income households, whose residents have the least ability to choose
+otherwise — is pushed onto the worst streets. On this measure, at this
+granularity, **it is not**. Deep-affordability units sit on much the same
+streets as shallower ones.
+
+A null result is only as strong as its measurement, so: ZIP-level aggregation
+could easily mask a within-ZIP pattern, since the deep-affordability building
+and the shallow one may sit on very different streets inside the same postal
+area. Testing that properly needs the spatial join described in section 4.1,
+not this one.
+
 ## RQ6 — *Member 3*
 ### Which affordability band lands in the riskiest ZIP codes?
 
@@ -1313,6 +1413,29 @@ rq6_pct.round(1)
 """)
 
 md(r"""
+### What RQ6 shows
+
+Broken out by band, the picture is less reassuring than RQ5's null suggested,
+because the bands are not distributed alike:
+
+* **Extremely-low income** units: 20.9% sit in the riskiest quintile of ZIPs,
+  and only 3.8% in the safest.
+* **Very-low income** units: the opposite shape — 44.1% cluster in quintile 2,
+  the second *safest* band.
+* **Moderate income** units: the most exposed of all, 23.1% in the riskiest
+  quintile and 0.2% in the safest.
+
+So the deepest-subsidy units are roughly five times more likely to be in the
+riskiest fifth of ZIPs than the safest, but moderate-income units are more
+exposed still, and very-low-income units are the least exposed. **There is no
+clean affordability gradient.**
+
+The honest summary is that this is not a story about subsidy depth. It is a
+story about *where affordable housing of any kind gets built*, which RQ8 takes
+up geographically. Note also that almost no affordable housing of any band
+reaches the safest quintile — those are low-density ZIPs that build very
+little.
+
 ## RQ7 — *Member 4*
 ### Where, on a map, do new affordable units and dangerous streets overlap?
 
@@ -1354,9 +1477,39 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_aspect(1 / np.cos(np.radians(40.7)))
 plt.show()
+
+print("Largest affordable-housing ZIPs, 2018-2025:")
+print(zip_totals.nlargest(5, "units")[
+    ["zip_code", "borough", "units", "crashes", "vru_rate"]].round(1).to_string(index=False))
+print("\nHighest pedestrian/cyclist injury rates among ZIPs that built >1,000 units:")
+print(zip_totals[zip_totals["units"] > 1000].nlargest(5, "vru_rate")[
+    ["zip_code", "borough", "units", "crashes", "vru_rate"]].round(1).to_string(index=False))
 """)
 
 md(r"""
+### What RQ7 shows
+
+The map separates two things the aggregate numbers blur together.
+
+The city's **largest** affordable-housing ZIPs are not its most dangerous.
+10475 in the Bronx — Co-op City — absorbs 15,531 units at a pedestrian-and-
+cyclist injury rate of 9.3, well below the city norm. 11101 in Queens (Long
+Island City, 9,556 units) sits at 10.8, and 11239 in Brooklyn at 9.5. These are
+tower-in-park and former-industrial sites: big parcels, few intersections, and
+correspondingly low pedestrian exposure.
+
+The exposed cases are **mid-sized projects in dense older neighbourhoods**, and
+they are strikingly concentrated: of the ZIPs that built more than 1,000 units,
+the five with the highest pedestrian-and-cyclist injury rates are **all in
+Manhattan** — 10009 (Alphabet City, 1,403 units at 23.1), 10010 (19.9), 10016
+(19.0), 10002 (Lower East Side, 4,929 units at 18.9) and 10023 (18.4). Every
+one is roughly double Co-op City's rate.
+
+This is the chart that undercuts the headline most usefully. "Affordable
+housing goes onto dangerous streets" is too coarse: the *biggest* schemes go
+onto land that exists precisely because it has no street grid, and it is the
+infill projects that land in traffic.
+
 ## RQ8 — *Member 4*
 ### Which borough has the worst mismatch between what it builds and what its streets do?
 
@@ -1393,6 +1546,33 @@ rq8[["unit_share", "vru_share", "gap"]].round(1)
 """)
 
 md(r"""
+### What RQ8 shows
+
+This is the sharpest result in the notebook, and it is a **mismatch between
+boroughs rather than within them**:
+
+| Borough | Share of new affordable units | Share of pedestrian & cyclist injuries | Gap |
+|---|---|---|---|
+| Bronx | 31.7% | 15.4% | **−16.3** |
+| Manhattan | 23.8% | 23.8% | 0.0 |
+| Staten Island | 0.8% | 2.2% | +1.5 |
+| Brooklyn | 30.5% | 35.5% | +5.0 |
+| Queens | 13.3% | 23.1% | **+9.8** |
+
+**Queens carries 23% of the city's pedestrian and cyclist injuries while
+receiving 13% of its new affordable housing** — the worst mismatch in the city.
+The Bronx is the mirror image, taking nearly a third of new units while
+accounting for 15% of injuries. Manhattan is almost exactly balanced.
+
+The surprise is that this inverts the intuition the project started with. The
+borough getting the *most* affordable housing is the one whose streets injure
+the *fewest* pedestrians and cyclists, relative to the city.
+
+Read carefully, this is a statement about two distributions, not about cause.
+It says nothing about whether a given building made a given street worse. What
+it does say is that the city's housing investment and its street-safety burden
+are pointed at **different boroughs**, and that is actionable on its own terms.
+
 ## RQ9 — *Member 5*
 ### Do crashes near new affordable housing happen for different reasons?
 
@@ -1431,6 +1611,28 @@ plt.show()
 """)
 
 md(r"""
+### What RQ9 shows
+
+The cause mix shifts, modestly but consistently, in the direction the street
+geometry would predict.
+
+* **Driver inattention/distraction** is the top factor everywhere, but falls
+  from 37.5% of crashes in no-completion ZIP-years to 33.9% in the
+  top-building quartile.
+* **Failure to yield right-of-way** — the classic turning-vehicle-versus-
+  pedestrian failure — falls from 12.9% to 8.9%.
+* **Passing too closely** rises from 5.2% to 7.3%, and **following too
+  closely** stays flat.
+
+The pattern is a shift away from intersection-conflict causes and toward
+congestion causes. That is what you would expect moving from fast arterial
+roads toward slower, denser streets — and it fits RQ7's finding that the
+biggest developments sit on large, low-intersection parcels.
+
+Note the limit: this classifies a crash by the *ZIP-year* it happened in, not
+by proximity to any building. It describes the kind of street environment
+these ZIPs have, not the effect of the housing in them.
+
 ## RQ10 — *Member 5*
 ### Is unit density associated with how *deadly* a ZIP's crashes are?
 
@@ -1469,10 +1671,90 @@ ax.set_xlabel("affordable units completed, 2018–2025 (log scale)")
 ax.set_ylabel("deaths per 1,000 crashes")
 ax.legend(frameon=False, fontsize=8, ncol=2)
 plt.show()
+
+print(f"n = {len(rq10)} ZIP codes | slope = {slope:+.2f} deaths/1k per 10x units "
+      f"| r = {r:+.3f} | city mean = {rq10['deaths_per_1k'].mean():.2f} deaths/1k crashes")
+""")
+
+md(r"""
+### What RQ10 shows
+
+Another near-null, pointing the opposite way from RQ1: r = −0.10 across 142
+ZIP codes, a slight tendency for ZIPs with **more** affordable housing to have
+**less** lethal crashes. The city mean is 1.72 deaths per 1,000 crashes.
+
+Taken with RQ1 this is the most informative pairing in the notebook. Crashes in
+high-building ZIPs **injure more pedestrians and cyclists** but **kill slightly
+fewer people per crash**. Those are not contradictory: they are the signature
+of dense, slow, pedestrian-heavy streets, where collisions are frequent and
+involve people on foot, but happen at speeds people survive. The lethal
+environment is the opposite one — fast roads with few pedestrians, which is
+also where the third of crash records we had to discard are concentrated.
+
+The practical implication is that "dangerous street" has to be defined before
+it can be measured. Our headline measure is injury exposure for pedestrians and
+cyclists; on a *fatality* measure, the conclusion would be milder and arguably
+reversed.
 """)
 
 # ------------------------------------------------------------- 8 export ----
 md(r"""
+---
+# 7.11 The discovery: what we found, and what surprised us
+
+Read together, the ten questions tell a more interesting story than the one we
+set out to find.
+
+### The headline
+
+**The city's affordable housing and its street danger are pointed at different
+boroughs.** Queens carries 23.1% of New York's pedestrian and cyclist injuries
+and receives 13.3% of its new affordable units; the Bronx takes 31.7% of the
+units while accounting for 15.4% of the injuries (RQ8). That is a 26-point
+spread between the two boroughs, and it is the one finding here large enough,
+and stable enough, to act on.
+
+### What surprised us
+
+1. **The premise was wrong in the direction we expected it to be right.** We
+   began by asking whether affordable housing is pushed onto the most dangerous
+   streets. At borough scale the opposite holds: the borough building the most
+   has comparatively safe streets.
+2. **There is no dose–response anywhere.** ZIP-years that built *anything* have
+   a higher pedestrian-and-cyclist injury rate than those that built nothing
+   (13.4–14.9 versus 9.7 per 100 crashes), but the four building quartiles are
+   flat against each other (RQ1). Building more does not go with more harm.
+3. **The event study found nothing** (RQ3). Around a ZIP's largest completion
+   wave, injuries track the borough's own trend. If construction drove street
+   harm, this is where it would show.
+4. **Depth of affordability does not predict street risk at all** — r = −0.03
+   (RQ5). The sharpest equity worry we could test did not survive contact with
+   the data.
+5. **The biggest projects sit on the safest streets.** Co-op City absorbed
+   15,531 units at an injury rate of 9.3; East Harlem's 6,629 units sit at 17.1
+   (RQ7). Large schemes need large parcels, and large parcels have few
+   intersections.
+6. **Injury and death point in opposite directions.** High-building ZIPs injure
+   more pedestrians and cyclists per crash but kill marginally fewer people
+   (r = −0.10, RQ10) — the signature of slow, dense, walkable streets.
+
+### What it adds up to
+
+The cross-sectional gap in RQ1 is almost certainly **composition, not effect**.
+531 of the 956 no-completion ZIP-years belong to 84 ZIP codes that never
+completed a single affordable unit in eight years — lower-density, more
+car-dependent places whose crashes injure motorists rather than pedestrians.
+Comparing them to building ZIPs compares two kinds of neighbourhood, not a
+neighbourhood before and after it builds. RQ3 and RQ5 both decline to find the
+effect that RQ1's bar chart superficially suggests, and we take that seriously
+rather than reporting the bar chart alone.
+
+The defensible claim is therefore narrow and geographic: **affordable housing
+goes where land is available, street danger is where the traffic is, and in New
+York those are substantially different places.** That is a siting-coordination
+problem, not a causal harm, and it is worth a planner's attention precisely
+because it can be fixed by coordination.
+
 ---
 # 8. Exporting the tables the website reads
 
@@ -1580,9 +1862,14 @@ completed, which can precede move-in by months.
   of number that belongs in a City Council testimony.
 
 The honest headline is narrow, and we would rather state it narrowly than
-overclaim: **the city's new affordable units are not distributed evenly with
-respect to street danger, and the difference is large enough to be worth a
-planner's attention.**
+overclaim: **New York's affordable-housing investment and its street-safety
+burden are concentrated in different boroughs — Queens bears 23% of the
+pedestrian and cyclist injuries while receiving 13% of the new units — and
+nothing in this data suggests that building the housing is what makes the
+streets dangerous.**
+
+Both halves of that sentence matter. The first is a real coordination failure.
+The second is what stops it being used as an argument against building.
 
 ---
 
