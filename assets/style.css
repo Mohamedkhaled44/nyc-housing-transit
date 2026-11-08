@@ -78,9 +78,6 @@ html, body {
   box-shadow: var(--shadow);
   padding: 20px;
   margin-bottom: 24px;
-  position: sticky;
-  top: 12px;
-  z-index: 40;
 }
 
 .search-row {
@@ -310,7 +307,7 @@ div[class*="-control"] {
   .story-grid { grid-template-columns: minmax(0, 1fr); }
   .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filter-row { grid-template-columns: minmax(0, 1fr); }
-  .controls { position: static; padding: 16px; }
+  .controls { padding: 16px; }
   .search-row { flex-direction: column; align-items: stretch; }
   .btn-ghost, .btn-primary { width: 100%; }
   .story { padding: 22px; }

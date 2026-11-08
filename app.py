@@ -65,14 +65,18 @@ INCOME_BANDS = {
     "Deep affordability (ext. low + very low)": "units_deep_affordable",
 }
 
+# An explicit height is required: dcc.Graph is `responsive`, and inside a CSS
+# grid cell with no intrinsic height the plot would otherwise collapse to a
+# few pixels. The map and the heatmap override it below.
 PLOTLY_LAYOUT = dict(
+    height=430,
     paper_bgcolor=PAPER,
     plot_bgcolor=PAPER,
     font=dict(family="Inter, Segoe UI, system-ui, sans-serif", size=12, color=INK),
-    margin=dict(l=56, r=24, t=64, b=52),
+    margin=dict(l=62, r=24, t=66, b=92),
     title=dict(font=dict(size=15, color=INK), x=0.01, xanchor="left"),
     hoverlabel=dict(font_size=12),
-    legend=dict(orientation="h", y=-0.18, x=0, font=dict(size=11)),
+    legend=dict(orientation="h", y=-0.26, x=0, font=dict(size=11)),
 )
 
 # --------------------------------------------------------------------------
@@ -325,7 +329,7 @@ def fig_scatter(data, unit_col, injured_col, band_label, user_label):
 
     return style(
         fig,
-        f"{band_label} vs. {user_label.lower()} injury rate — association, not causation",
+        f"Units built vs. {user_label.lower()} injury rate, by ZIP",
         "affordable units completed in the selection (log scale)",
         f"{user_label} injured per 100 crashes",
     )
@@ -390,6 +394,8 @@ def fig_trend(data, unit_col, injured_col, band_label, user_label):
     fig.update_layout(**PLOTLY_LAYOUT)
     fig.update_layout(
         title_text="Housing completed and people hurt, year by year",
+        # extra right margin: this chart carries a second y-axis on that side
+        margin=dict(l=62, r=76, t=66, b=92),
         xaxis=dict(title="year", gridcolor="#eceff3", dtick=1),
         # plotly>=6 removed the `titlefont` shortcut: the font lives inside `title`.
         yaxis=dict(title=dict(text="affordable units", font=dict(color=HOUSING)),
@@ -487,8 +493,21 @@ def kpi(value, label, color=INK):
     )
 
 
-def card(graph_id, note=None):
-    children = [dcc.Graph(id=graph_id, config={"displayModeBar": False, "responsive": True})]
+def card(graph_id, note=None, height=430):
+    """A chart in a panel.
+
+    The height has to be set in CSS, not only in the figure layout: with
+    `responsive: True` Plotly sizes the plot to its container and ignores
+    `layout.height`, and a CSS grid cell has no intrinsic height, so the chart
+    would collapse to a few pixels.
+    """
+    children = [
+        dcc.Graph(
+            id=graph_id,
+            config={"displayModeBar": False, "responsive": True},
+            style={"height": f"{height}px", "width": "100%"},
+        )
+    ]
     if note:
         children.append(html.P(note, className="chart-note"))
     return html.Div(className="card", children=children)
@@ -596,7 +615,7 @@ app.layout = html.Div(
                 html.Div(className="span-2", children=[
                     card("map", "Circles are ZIP codes, sized by crash volume and coloured by "
                                 "injury rate; blue dots are individual affordable buildings. "
-                                "Drag to pan, scroll to zoom.")]),
+                                "Drag to pan, scroll to zoom.", height=520)]),
                 card("scatter", "Each point is one ZIP code. The dashed line is a least-squares "
                                 "fit — it describes the pattern, it does not explain it."),
                 card("tiers", "ZIP-years split into quartiles by units completed, plus those "
@@ -604,7 +623,7 @@ app.layout = html.Div(
                 card("trend", "Bars read against the left axis, the line against the right."),
                 card("boroughs", "Positive means the borough carries a larger share of injuries "
                                  "than of new affordable units."),
-                html.Div(className="span-2", children=[card("factors")]),
+                html.Div(className="span-2", children=[card("factors", height=460)]),
             ],
         ),
 
