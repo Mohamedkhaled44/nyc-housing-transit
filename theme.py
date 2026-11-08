@@ -74,14 +74,24 @@ def plotly_layout(T):
             size=12,
             color=T["ink"],
         ),
-        margin=dict(l=62, r=24, t=66, b=92),
-        title=dict(font=dict(size=15, color=T["ink"]), x=0.01, xanchor="left"),
+        # Small floors, not fixed values: every axis sets automargin=True, so
+        # Plotly grows these to exactly fit the tick labels, axis titles and
+        # legend. Hard-coded margins cost a phone-width chart most of its plot
+        # area and pushed rotated axis titles outside the figure entirely.
+        margin=dict(l=12, r=12, t=58, b=12, autoexpand=True),
+        title=dict(font=dict(size=14, color=T["ink"]), x=0.01, xanchor="left",
+                   automargin=True),
         hoverlabel=dict(
             font_size=12,
             bgcolor=T["paper"],
             bordercolor=T["grid"],
             font_color=T["ink"],
         ),
-        legend=dict(orientation="h", y=-0.26, x=0, font=dict(size=11, color=T["ink"])),
+        # Small items so a five-borough legend wraps instead of running off
+        # the right edge of a phone-width chart.
+        legend=dict(orientation="h", y=-0.24, x=0, xanchor="left",
+                    font=dict(size=10, color=T["ink"]),
+                    itemwidth=30, itemsizing="constant",
+                    bgcolor="rgba(0,0,0,0)"),
         transition=dict(duration=250, easing="cubic-in-out"),
     )

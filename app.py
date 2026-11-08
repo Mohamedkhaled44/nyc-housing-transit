@@ -183,15 +183,26 @@ def empty_figure(T, message="No data matches these filters."):
     return fig
 
 
-def style(fig, T, title, xtitle=None, ytitle=None):
+def style(fig, T, title, xtitle=None, ytitle=None, subtitle=None):
     fig.update_layout(**plotly_layout(T))
-    fig.update_layout(title_text=title)
+    # Native title.subtitle rather than an embedded "<br><sub>": Plotly then
+    # reserves the space itself, instead of the second line overflowing the
+    # top margin and being clipped by the card.
+    fig.update_layout(title=dict(
+        text=title,
+        subtitle=dict(text=subtitle, font=dict(size=11, color=T["muted"]))
+        if subtitle else None,
+    ))
     if xtitle:
         fig.update_xaxes(title_text=xtitle)
     if ytitle:
         fig.update_yaxes(title_text=ytitle)
-    fig.update_xaxes(gridcolor=T["grid"], zerolinecolor=T["grid"], linecolor=T["grid"])
-    fig.update_yaxes(gridcolor=T["grid"], zerolinecolor=T["grid"], linecolor=T["grid"])
+    # automargin lets Plotly reserve exactly what the labels and titles need.
+    # Without it a long rotated y-title overflows the figure at phone widths.
+    fig.update_xaxes(gridcolor=T["grid"], zerolinecolor=T["grid"],
+                     linecolor=T["grid"], automargin=True, title_standoff=8)
+    fig.update_yaxes(gridcolor=T["grid"], zerolinecolor=T["grid"],
+                     linecolor=T["grid"], automargin=True, title_standoff=8)
     return fig
 
 
@@ -256,12 +267,22 @@ def fig_map(data, points, injured_col, T):
 
     fig.update_layout(**plotly_layout(T))
     fig.update_layout(
-        title_text="Where the housing goes and where the streets hurt people",
+        title_text="Where housing meets street danger",
         map_style=T["map_style"],
         margin=dict(l=0, r=0, t=54, b=0),
-        coloraxis_colorbar=dict(title="injuries<br>per 100<br>crashes", thickness=12),
+        # Horizontal and inside the map frame. A vertical colorbar sits outside
+        # the plot area, and with r=0 it was clipped off the right edge at
+        # phone widths.
+        coloraxis_colorbar=dict(
+            orientation="h",
+            title=dict(text="injuries per 100 crashes", side="top",
+                       font=dict(size=10, color=T["ink"])),
+            x=0.5, xanchor="center", y=0.99, yanchor="top",
+            len=0.8, thickness=9, outlinewidth=0,
+            bgcolor=T["legend_bg"], tickfont=dict(size=9, color=T["ink"]),
+        ),
         legend=dict(orientation="h", y=0.01, x=0.01,
-                    bgcolor=T["legend_bg"], font=dict(color=T["ink"])),
+                    bgcolor=T["legend_bg"], font=dict(size=10, color=T["ink"])),
     )
     return fig
 
@@ -306,9 +327,10 @@ def fig_scatter(data, unit_col, injured_col, band_label, user_label, T):
 
     return style(
         fig, T,
-        f"Units built vs. {user_label.lower()} injury rate, by ZIP",
-        "affordable units completed in the selection (log scale)",
-        f"{user_label} injured per 100 crashes",
+        "Units built vs. injury rate, by ZIP",
+        "affordable units (log scale)",
+        "injured per 100 crashes",
+        subtitle=f"{user_label} · each point is one ZIP code",
     )
 
 
@@ -338,9 +360,10 @@ def fig_tiers(data, injured_col, user_label, T):
     ))
     return style(
         fig, T,
-        f"Does building more go with more harm? ({user_label.lower()})",
-        "affordable units completed in the ZIP-year",
-        "median injuries per 100 crashes",
+        "Does building more go with more harm?",
+        "units completed in the ZIP-year",
+        "median injuries / 100 crashes",
+        subtitle=user_label,
     )
 
 
@@ -369,16 +392,18 @@ def fig_trend(data, unit_col, injured_col, band_label, user_label, T):
     ))
     fig.update_layout(**plotly_layout(T))
     fig.update_layout(
-        title_text="Housing completed and people hurt, year by year",
-        # extra right margin: this chart carries a second y-axis on that side
-        margin=dict(l=62, r=76, t=66, b=92),
-        xaxis=dict(title="year", gridcolor=T["grid"], dtick=1),
+        title=dict(text="Housing completed and people hurt",
+                   subtitle=dict(text=f"{band_label} vs. {user_label.lower()} injured",
+                                 font=dict(size=11, color=T["muted"]))),
+        xaxis=dict(title="year", gridcolor=T["grid"], dtick=1, automargin=True),
         # plotly>=6 removed the `titlefont` shortcut: the font lives in `title`.
-        yaxis=dict(title=dict(text="affordable units", font=dict(color=T["housing"])),
-                   gridcolor=T["grid"], tickfont=dict(color=T["housing"])),
-        yaxis2=dict(title=dict(text=f"{user_label} injured", font=dict(color=T["crash"])),
+        yaxis=dict(title=dict(text="units", font=dict(color=T["housing"])),
+                   gridcolor=T["grid"], tickfont=dict(color=T["housing"]),
+                   automargin=True, title_standoff=8),
+        yaxis2=dict(title=dict(text="injured", font=dict(color=T["crash"])),
                     overlaying="y", side="right", showgrid=False,
-                    tickfont=dict(color=T["crash"])),
+                    tickfont=dict(color=T["crash"]),
+                    automargin=True, title_standoff=8),
     )
     return fig
 
@@ -408,9 +433,38 @@ def fig_boroughs(data, unit_col, injured_col, T):
     ))
     fig.add_vline(x=0, line_color=T["muted"], line_width=1)
     return style(
-        fig, T, "Which borough absorbs more harm than housing?",
-        "share of injuries minus share of new units (pp)", "",
+        fig, T, "Harm vs. housing, by borough",
+        "percentage points", "",
+        subtitle="injury share minus new-unit share",
     )
+
+
+# NYPD's contributing-factor names are long enough that, left as published,
+# the heatmap's label gutter takes 223px of a 390px phone screen and leaves
+# 81px for the data. These keep the meaning and give the plot its width back.
+FACTOR_LABELS = {
+    "Driver Inattention/Distraction": "Driver inattention",
+    "Failure To Yield Right-Of-Way": "Failure to yield",
+    "Passing Or Lane Usage Improper": "Improper lane use",
+    "Reaction To Uninvolved Vehicle": "Reaction to vehicle",
+    "Traffic Control Disregarded": "Ran traffic control",
+    "Following Too Closely": "Following closely",
+    "Unsafe Lane Changing": "Unsafe lane change",
+    "Driver Inexperience": "Inexperience",
+    "Alcohol Involvement": "Alcohol",
+    "Passing Too Closely": "Passing closely",
+    "Turning Improperly": "Turning improperly",
+    "Backing Unsafely": "Backing unsafely",
+    "Other Vehicular": "Other vehicular",
+    "Does Not Apply": "Not applicable",
+    "Unsafe Speed": "Unsafe speed",
+}
+
+
+def shorten_factor(name):
+    """Map a published factor name to a short label, truncating anything new."""
+    label = FACTOR_LABELS.get(name, name)
+    return label if len(label) <= 20 else label[:19].rstrip() + "…"
 
 
 def fig_factors(data, factors, T):
@@ -435,6 +489,7 @@ def fig_factors(data, factors, T):
     totals = pivot.sum(axis=0).replace(0, np.nan)
     share = (100 * pivot.div(totals, axis=1)).fillna(0)
     share = share.loc[share.mean(axis=1).nlargest(10).index]
+    share.index = [shorten_factor(f) for f in share.index]
 
     fig = px.imshow(share, color_continuous_scale=T["seq"], aspect="auto",
                     labels=dict(color="% of crashes"), text_auto=".1f")
@@ -443,12 +498,16 @@ def fig_factors(data, factors, T):
     )
     fig.update_layout(**plotly_layout(T))
     fig.update_layout(
-        title_text="Why crashes happen, by how much the ZIP built (each column = 100%)",
-        margin=dict(l=190, r=24, t=66, b=56),
+        title=dict(text="Why crashes happen, by development tier",
+                   subtitle=dict(text="each column sums to 100%",
+                                 font=dict(size=11, color=T["muted"]))),
         coloraxis_colorbar=dict(title="% of<br>crashes", thickness=12),
     )
-    fig.update_xaxes(title_text="affordable units completed in the ZIP-year", side="bottom")
-    fig.update_yaxes(title_text="")
+    # automargin sizes the left gutter to the factor labels; a fixed 190px
+    # swallowed half the width on a phone.
+    fig.update_xaxes(title_text="units completed in the ZIP-year", side="bottom",
+                     automargin=True)
+    fig.update_yaxes(title_text="", automargin=True)
     return fig
 
 

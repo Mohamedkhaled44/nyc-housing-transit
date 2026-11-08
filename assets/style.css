@@ -31,8 +31,11 @@
   --s-6: clamp(2.6rem, 1.7rem + 3.6vw, 5.6rem);
 
   /* fluid chart heights */
-  --h-chart: clamp(320px, 26vw + 170px, 470px);
-  --h-chart-wide: clamp(380px, 30vw + 190px, 580px);
+  /* The floor matters most: on a phone the plot area is what is left after
+     the title, tick labels and legend, so a short chart leaves almost nothing
+     to draw in. 420/470 keeps a usable plotting area at 390px wide. */
+  --h-chart: clamp(420px, 26vw + 170px, 470px);
+  --h-chart-wide: clamp(470px, 30vw + 190px, 580px);
 
   --radius: clamp(12px, 0.7vw + 9px, 18px);
   --measure: 66ch;
