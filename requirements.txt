@@ -1,0 +1,9 @@
+# Pinned to the versions the project was developed and tested against.
+# gunicorn is the production server used by Render (start: gunicorn app:server).
+
+dash==4.5.0
+plotly==7.1.0
+pandas==3.0.3
+numpy==2.4.4
+requests==2.34.2
+gunicorn==26.2.0

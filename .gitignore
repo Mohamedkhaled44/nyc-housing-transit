@@ -1,0 +1,18 @@
+# Raw NYC Open Data pulls — regenerate with `python download_data.py`.
+# The crash slice is ~300 MB, well over GitHub's 100 MB per-file limit.
+data/raw/
+
+# Processed files that the website needs ARE committed (data/processed/),
+# so the deployed app never has to call the NYC Open Data API.
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+.env
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

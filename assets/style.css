@@ -1,0 +1,317 @@
+/* ------------------------------------------------------------------
+   Affordable housing on dangerous streets — NYC
+   Dash serves everything in /assets automatically.
+   ------------------------------------------------------------------ */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap");
+
+:root {
+  --ink: #1d2430;
+  --muted: #6b7280;
+  --line: #e3e8ee;
+  --canvas: #f4f6f8;
+  --paper: #ffffff;
+  --housing: #2a6f97;
+  --housing-soft: #e8f0f6;
+  --crash: #c1462e;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px rgba(16, 24, 40, .06);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 16px 72px;
+}
+
+/* ----------------------------------------------------------- hero ---- */
+.hero {
+  padding: 56px 0 28px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--housing);
+}
+
+.hero h1 {
+  margin: 0 0 16px;
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: clamp(1.75rem, 4.2vw, 3rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -.02em;
+  max-width: 20ch;
+}
+
+.standfirst {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 1.0625rem;
+  color: #46505e;
+}
+
+/* ------------------------------------------------------- controls ---- */
+.controls {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 24px;
+  position: sticky;
+  top: 12px;
+  z-index: 40;
+}
+
+.search-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.control { min-width: 0; }
+.control.grow { flex: 1 1 auto; }
+
+.control label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.search-input:focus,
+.btn:focus-visible {
+  outline: 2px solid var(--housing);
+  outline-offset: 1px;
+}
+
+.search-input::placeholder { color: #9aa3ae; }
+
+/* Dash's react-select needs a light touch to match the inputs */
+.Select-control,
+.is-focused .Select-control,
+div[class*="-control"] {
+  min-height: 40px !important;
+  border-radius: 9px !important;
+  border-color: var(--line) !important;
+  font-size: 14px;
+}
+
+.generate-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+
+.btn {
+  border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .06s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  height: 44px;
+  padding: 0 28px;
+  font-size: 15px;
+  color: #fff;
+  background: var(--housing);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .1), 0 6px 16px rgba(42, 111, 151, .28);
+}
+
+.btn-primary:hover { background: #22597a; }
+
+.btn-ghost {
+  height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+  color: var(--housing);
+  background: var(--housing-soft);
+  white-space: nowrap;
+}
+
+.btn-ghost:hover { background: #d9e6ef; }
+
+.filter-summary {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------ kpis --- */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.kpi {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+}
+
+.kpi-value {
+  font-size: clamp(1.25rem, 2.1vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-label {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* ----------------------------------------------------------- grid ---- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.span-2 { grid-column: 1 / -1; }
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px 8px 4px;
+  overflow: hidden;
+}
+
+.chart-note {
+  margin: 0;
+  padding: 2px 14px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------- story ---- */
+.story {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 32px;
+}
+
+.story h2 {
+  margin: 0 0 24px;
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.story-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 40px;
+}
+
+.story h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--housing);
+}
+
+.story p {
+  margin: 0;
+  font-size: 15px;
+  color: #3c4654;
+}
+
+.story a { color: var(--housing); }
+
+/* ----------------------------------------------------------- foot ---- */
+.foot {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.foot p { margin: 0 0 6px; }
+
+/* ------------------------------------------------------ responsive --- */
+@media (max-width: 1000px) {
+  .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .page { padding: 0 14px 56px; }
+  .hero { padding: 36px 0 22px; }
+  .grid,
+  .story-grid { grid-template-columns: minmax(0, 1fr); }
+  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-row { grid-template-columns: minmax(0, 1fr); }
+  .controls { position: static; padding: 16px; }
+  .search-row { flex-direction: column; align-items: stretch; }
+  .btn-ghost, .btn-primary { width: 100%; }
+  .story { padding: 22px; }
+}
