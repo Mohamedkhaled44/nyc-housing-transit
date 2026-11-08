@@ -29,20 +29,23 @@ from dash import Dash, Input, Output, State, dcc, html
 # --------------------------------------------------------------------------
 # Theme
 # --------------------------------------------------------------------------
-HOUSING = "#2a6f97"
-CRASH = "#c1462e"
-INK = "#1d2430"
-MUTED = "#6b7280"
-PAPER = "#ffffff"
-CANVAS = "#f4f6f8"
-SEQ = ["#fff3b0", "#ffd166", "#f4845f", "#d1495b", "#8d2135"]
+HOUSING = "#4cc9f0"
+CRASH = "#ff5c68"
+INK = "#eaf0fb"
+MUTED = "#7c89a0"
+PAPER = "#121823"      # panel background — matches .card in style.css
+GRID = "#222c3f"
+
+# Cold -> hot. Reads as low -> high risk and stays legible on a dark panel,
+# unlike a classic YlOrRd whose pale low end vanishes against it.
+SEQ = ["#1f4e79", "#2e8bc0", "#6fd3c7", "#f7d774", "#f79256", "#ff4d6d"]
 
 BOROUGH_COLORS = {
-    "BRONX": "#8c5383",
-    "BROOKLYN": "#2a6f97",
-    "MANHATTAN": "#c1462e",
-    "QUEENS": "#3f7d20",
-    "STATEN ISLAND": "#d98e04",
+    "BRONX": "#c77dff",
+    "BROOKLYN": "#4cc9f0",
+    "MANHATTAN": "#ff5c68",
+    "QUEENS": "#80ed99",
+    "STATEN ISLAND": "#ffd166",
 }
 
 TIER_ORDER = ["No completions", "Q1 lowest", "Q2", "Q3", "Q4 highest"]
@@ -201,7 +204,7 @@ def empty_figure(message="No data matches these filters."):
     """Every chart falls back to this instead of raising on an empty frame."""
     fig = go.Figure()
     fig.add_annotation(
-        text=message, showarrow=False, font=dict(size=13, color=MUTED),
+        text=message, showarrow=False, font=dict(size=13.5, color=MUTED),
         xref="paper", yref="paper", x=0.5, y=0.5,
     )
     fig.update_layout(**PLOTLY_LAYOUT)
@@ -217,8 +220,8 @@ def style(fig, title, xtitle=None, ytitle=None):
         fig.update_xaxes(title_text=xtitle)
     if ytitle:
         fig.update_yaxes(title_text=ytitle)
-    fig.update_xaxes(gridcolor="#eceff3", zerolinecolor="#dde2e8")
-    fig.update_yaxes(gridcolor="#eceff3", zerolinecolor="#dde2e8")
+    fig.update_xaxes(gridcolor=GRID, zerolinecolor=GRID, linecolor=GRID)
+    fig.update_yaxes(gridcolor=GRID, zerolinecolor=GRID, linecolor=GRID)
     return fig
 
 
@@ -243,10 +246,18 @@ def fig_map(data, points, injured_col):
     if zips.empty:
         return empty_figure("No mappable ZIP codes in this selection.")
 
+    # Clamp the colour range to the 5th-95th percentile of what is actually on
+    # screen. Left unbounded, a couple of extreme ZIPs stretch the scale and
+    # push almost every circle into the first colour stop, so the map reads as
+    # uniformly blue and shows nothing.
+    lo, hi = zips["rate"].quantile([0.05, 0.95])
+    if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+        lo, hi = float(zips["rate"].min()), float(max(zips["rate"].max(), zips["rate"].min() + 1))
+
     fig = px.scatter_map(
         zips,
         lat="lat", lon="lon", size="crashes", color="rate",
-        color_continuous_scale=SEQ, size_max=34, zoom=9.2,
+        color_continuous_scale=SEQ, range_color=(lo, hi), size_max=34, zoom=9.2,
         center=dict(lat=40.714, lon=-73.94),
         custom_data=["zip_code", "borough", "units", "crashes", "rate"],
         labels={"rate": "injuries / 100 crashes"},
@@ -266,7 +277,9 @@ def fig_map(data, points, injured_col):
         fig.add_trace(
             go.Scattermap(
                 lat=sample["lat"], lon=sample["lon"], mode="markers",
-                marker=dict(size=6, color=HOUSING, opacity=0.85),
+                # White, not the housing blue: the risk ramp's low end is also
+                # blue, and the two layers were indistinguishable on the map.
+                marker=dict(size=5, color="#ffffff", opacity=0.9),
                 name="affordable buildings",
                 customdata=np.stack([sample["project_name"].astype(str),
                                      sample["total_units"], sample["year"]], axis=-1),
@@ -278,11 +291,12 @@ def fig_map(data, points, injured_col):
     fig.update_layout(**PLOTLY_LAYOUT)
     fig.update_layout(
         title_text="Where the housing goes and where the streets hurt people",
-        map_style="carto-positron",
+        map_style="carto-darkmatter",
         margin=dict(l=0, r=0, t=54, b=0),
         height=520,
         coloraxis_colorbar=dict(title="injuries<br>per 100<br>crashes", thickness=12),
-        legend=dict(orientation="h", y=0.01, x=0.01, bgcolor="rgba(255,255,255,0.75)"),
+        legend=dict(orientation="h", y=0.01, x=0.01, bgcolor="rgba(10,13,20,0.72)",
+                    font=dict(color=INK)),
     )
     return fig
 
@@ -307,7 +321,7 @@ def fig_scatter(data, unit_col, injured_col, band_label, user_label):
         custom_data=["zip_code", "units", "crashes", "rate"],
     )
     fig.update_traces(
-        marker=dict(line=dict(width=0.6, color="white")),
+        marker=dict(line=dict(width=0.8, color="#0a0d14")),
         hovertemplate=("<b>ZIP %{customdata[0]}</b><br>%{customdata[1]:,.0f} units<br>"
                        "%{customdata[2]:,.0f} crashes<br>"
                        "%{customdata[3]:.1f} injuries / 100 crashes<extra></extra>"),
@@ -322,7 +336,7 @@ def fig_scatter(data, unit_col, injured_col, band_label, user_label):
         fig.add_trace(
             go.Scatter(
                 x=10 ** xs, y=slope * xs + intercept, mode="lines",
-                line=dict(color=INK, dash="dash", width=2),
+                line=dict(color="#e2e8f5", dash="dash", width=2),
                 name=f"trend (r = {r:+.2f})", hoverinfo="skip",
             )
         )
@@ -396,10 +410,10 @@ def fig_trend(data, unit_col, injured_col, band_label, user_label):
         title_text="Housing completed and people hurt, year by year",
         # extra right margin: this chart carries a second y-axis on that side
         margin=dict(l=62, r=76, t=66, b=92),
-        xaxis=dict(title="year", gridcolor="#eceff3", dtick=1),
+        xaxis=dict(title="year", gridcolor=GRID, dtick=1),
         # plotly>=6 removed the `titlefont` shortcut: the font lives inside `title`.
         yaxis=dict(title=dict(text="affordable units", font=dict(color=HOUSING)),
-                   gridcolor="#eceff3", tickfont=dict(color=HOUSING)),
+                   gridcolor=GRID, tickfont=dict(color=HOUSING)),
         yaxis2=dict(title=dict(text=f"{user_label} injured", font=dict(color=CRASH)),
                     overlaying="y", side="right", showgrid=False,
                     tickfont=dict(color=CRASH)),
@@ -430,7 +444,7 @@ def fig_boroughs(data, unit_col, injured_col):
         hovertemplate=("<b>%{y}</b><br>%{customdata[0]:.1f}% of new units<br>"
                        "%{customdata[1]:.1f}% of injuries<extra></extra>"),
     ))
-    fig.add_vline(x=0, line_color=INK, line_width=1)
+    fig.add_vline(x=0, line_color="#8894ab", line_width=1)
     return style(
         fig,
         "Which borough absorbs more harm than housing?",
@@ -545,7 +559,11 @@ app.layout = html.Div(
             children=[
                 html.P("NYC Open Data · Housing & Development × Transportation",
                        className="eyebrow"),
-                html.H1("Does New York build affordable housing on its most dangerous streets?"),
+                html.H1([
+                    "Does New York build affordable housing on its ",
+                    html.Em("most dangerous"),
+                    " streets?",
+                ]),
                 html.P(
                     "An affordable apartment is not only a rent number — it is a front door "
                     "that opens onto a particular street. We took 1.04 million police-reported "
