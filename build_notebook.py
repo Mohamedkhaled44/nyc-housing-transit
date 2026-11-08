@@ -1891,8 +1891,76 @@ https://data.cityofnewyork.us/resource/h9gi-nx95.csv?$limit=250000&$offset=<n>
 
 # Appendix B — LLM prompt log
 
-See [`PROMPT_LOG.md`](PROMPT_LOG.md) in the repository root for the complete,
-verbatim log of every prompt used at every stage of this project.
+The brief requires the prompts used at any step of the project to be recorded.
+They are reproduced in full here, and also kept in
+[`PROMPT_LOG.md`](PROMPT_LOG.md) in the repository root.
+
+**Where an LLM was used:** reading the project brief, shortlisting and verifying
+the two datasets against the NYC Open Data API, drafting the download script,
+this cleaning and integration notebook, and the Dash website.
+
+**How the output was verified:** the analytical decisions — the choice of join
+key, the join type, each drop-versus-impute call, the treatment of outliers —
+are argued in this notebook's own markdown cells against evidence printed in
+the cell directly above each one, so a reader can check the reasoning against
+the numbers rather than taking it on trust. Every figure and statistic quoted
+here, in the README and on the website was produced by executing this code
+against the live data; nothing is quoted from memory. Where a stated number and
+the executed output disagreed, the prose was corrected to match the output.
+
+### Prompts, in order
+
+> **1.** okay do you have the project file in here?
+
+> **2.** yes extract it and read both pdfs make a full plan then tell me
+> throught the phone
+
+> **3.** Okay we are 5 members / 2,3 i don't know about that
+
+> **4.** Do the whole project there is no time to give me them anything to do
+> hence that i dont have there contact info also
+
+> **5.** But remove anything that related to claude from the repo
+
+> **6.** I need a cool design
+
+> **7.** Change this font i dont like this style and also make it flexible as a
+> design
+
+### Verification queries issued against the NYC Open Data API
+
+Run *before* either dataset was committed to, to confirm the column counts, row
+counts and date ranges stated above rather than relying on recalled values:
+
+```
+# catalog search for candidate datasets and their column counts
+https://api.us.socrata.com/api/catalog/v1?domains=data.cityofnewyork.us&q=<dataset name>
+
+# full column metadata for each finalist
+https://data.cityofnewyork.us/api/views/hg8x-zxpr.json
+https://data.cityofnewyork.us/api/views/h9gi-nx95.json
+https://data.cityofnewyork.us/api/views/ygpa-z7cr.json
+
+# row counts and coverage, used to justify the 2018-2025 analysis window
+.../resource/h9gi-nx95.json?$select=count(*)&$where=crash_date >= '2018-01-01T00:00:00'
+.../resource/h9gi-nx95.json?$select=max(crash_date),min(crash_date)
+.../resource/hg8x-zxpr.json?$select=count(*)
+.../resource/hg8x-zxpr.json?$select=min(project_completion_date),max(project_completion_date)
+
+# ZIP coverage on the crash side, which drives the largest cleaning decision
+.../resource/h9gi-nx95.json?$select=count(*)&$where=... AND zip_code IS NOT NULL
+
+# housing completions per year, used to pick the window
+.../resource/hg8x-zxpr.json?$select=date_trunc_y(project_completion_date) as yr,count(*)&$group=yr
+```
+
+| Query | Result | What it decided |
+|---|---|---|
+| crashes, 2018-01-01 onward | 1,114,623 rows | exceeds Socrata's 1,000,000-row response cap, so the download must be paged |
+| crashes, 2018–2025 | 1,043,903 rows | the analysis window |
+| crashes 2018–2025 with a ZIP | 700,423 rows | ~33% of crash records cannot be joined; drives the main cleaning decision and the bias reported in section 9 |
+| crash date range | 2012-07-01 to 2026-11-03 | 2026 is partial — excluded |
+| housing completions by year | 2014–2026, 1,819 undated | 2026 is partial — excluded; undated rows need a fallback rule |
 """)
 
 # ------------------------------------------------------------- assemble ----
