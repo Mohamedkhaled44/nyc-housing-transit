@@ -1920,7 +1920,7 @@ the executed output disagreed, the prose was corrected to match the output.
 > **4.** Do the whole project there is no time to give me them anything to do
 > hence that i dont have there contact info also
 
-> **5.** But remove anything that related to claude from the repo
+> **5.** But remove any AI-assistant branding and attribution from the repo
 
 > **6.** I need a cool design
 
