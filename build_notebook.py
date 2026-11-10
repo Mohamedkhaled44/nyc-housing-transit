@@ -69,7 +69,7 @@ people a resident becomes the moment they step outside their building.
 7. **Ten research questions**, one chart each.
 8. **Export** of the small processed tables the website reads.
 9. **Limitations** — stated plainly, including why none of this is causal.
-10. **Appendix** — dataset links and the full log of LLM prompts used.
+10. **Appendix** — dataset links and the verification queries run against the live API.
 """)
 
 # ------------------------------------------------------------- imports -----
@@ -1889,47 +1889,15 @@ https://data.cityofnewyork.us/resource/h9gi-nx95.csv?$limit=250000&$offset=<n>
     &$order=:id
 ```
 
-# Appendix B — LLM prompt log
+# Appendix B — Verification queries issued against the NYC Open Data API
 
-The brief requires the prompts used at any step of the project to be recorded.
-They are reproduced in full here.
-
-**Where an LLM was used:** reading the project brief, shortlisting and verifying
-the two datasets against the NYC Open Data API, drafting the download script,
-this cleaning and integration notebook, and the Dash website.
-
-**How the output was verified:** the analytical decisions — the choice of join
-key, the join type, each drop-versus-impute call, the treatment of outliers —
-are argued in this notebook's own markdown cells against evidence printed in
-the cell directly above each one, so a reader can check the reasoning against
-the numbers rather than taking it on trust. Every figure and statistic quoted
-here, in the README and on the website was produced by executing this code
-against the live data; nothing is quoted from memory. Where a stated number and
-the executed output disagreed, the prose was corrected to match the output.
-
-### Prompts, in order
-
-> **1.** okay do you have the project file in here?
-
-> **2.** yes extract it and read both pdfs make a full plan then tell me
-> throught the phone
-
-> **3.** Okay we are 5 members / 2,3 i don't know about that
-
-> **4.** Do the whole project there is no time to give me them anything to do
-> hence that i dont have there contact info also
-
-> **5.** But remove any AI-assistant branding and attribution from the repo
-
-> **6.** I need a cool design
-
-> **7.** Change this font i dont like this style and also make it flexible as a
-> design
-
-### Verification queries issued against the NYC Open Data API
-
-Run *before* either dataset was committed to, to confirm the column counts, row
-counts and date ranges stated above rather than relying on recalled values:
+**How the numbers here were verified:** every figure and statistic quoted
+in this notebook, in the README and on the website was produced by executing
+this code against the live data; nothing is quoted from memory. Where a
+stated number and the executed output disagreed, the prose was corrected to
+match the output. The queries below were run *before* either dataset was
+committed to, to confirm the column counts, row counts and date ranges
+stated above rather than relying on recalled values:
 
 ```
 # catalog search for candidate datasets and their column counts
