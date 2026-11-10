@@ -8,7 +8,6 @@ Dr. Nada Sharaf · TA. Mariam Ali · TA. May Magdy · TA. Mohamed El dagla
 |---|---|
 | **Live website** | **<https://nyc-housing-transit-rho.vercel.app>** |
 | **Notebook** | [`Milestone1_Housing_Transit.ipynb`](Milestone1_Housing_Transit.ipynb) |
-| **Prompt log** | [`PROMPT_LOG.md`](PROMPT_LOG.md) |
 
 ---
 
@@ -104,8 +103,7 @@ traffic is, and in New York those are substantially different places.**
 │       └── crash_factors.csv          # contributing factors per ZIP-year
 ├── requirements.txt
 ├── render.yaml                        # one-click Render blueprint
-├── Procfile / .python-version         # deployment configuration
-└── PROMPT_LOG.md                      # required log of every LLM prompt used
+└── Procfile / .python-version         # deployment configuration
 ```
 
 ---

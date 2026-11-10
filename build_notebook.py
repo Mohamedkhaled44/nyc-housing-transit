@@ -1892,8 +1892,7 @@ https://data.cityofnewyork.us/resource/h9gi-nx95.csv?$limit=250000&$offset=<n>
 # Appendix B — LLM prompt log
 
 The brief requires the prompts used at any step of the project to be recorded.
-They are reproduced in full here, and also kept in
-[`PROMPT_LOG.md`](PROMPT_LOG.md) in the repository root.
+They are reproduced in full here.
 
 **Where an LLM was used:** reading the project brief, shortlisting and verifying
 the two datasets against the NYC Open Data API, drafting the download script,

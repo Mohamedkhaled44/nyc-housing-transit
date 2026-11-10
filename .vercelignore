@@ -9,6 +9,5 @@ build_notebook.py
 download_data.py
 render.yaml
 Procfile
-PROMPT_LOG.md
 README.md
 .git
