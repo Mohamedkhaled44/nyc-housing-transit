@@ -66,7 +66,7 @@ people a resident becomes the moment they step outside their building.
 4. **Integration** — aggregation of both datasets to ZIP × year and the join.
 5. **Post-integration cleaning** — join-induced nulls, redundant columns, dtypes.
 6. **Validation** — plots that show the cleaning did what we claim.
-7. **Ten research questions**, two per team member, one chart each.
+7. **Ten research questions**, one chart each.
 8. **Export** of the small processed tables the website reads.
 9. **Limitations** — stated plainly, including why none of this is causal.
 10. **Appendix** — dataset links and the full log of LLM prompts used.
@@ -1050,8 +1050,8 @@ md(r"""
 ---
 # 7. Research questions
 
-Ten questions, two per team member, one chart each. Member assignments are
-listed in `README.md` and repeated in the heading of each subsection.
+Ten questions, one chart each. Who worked on what is listed in
+`README.md`.
 
 A note that applies to **all ten**: every relationship below is an
 **association measured across ZIP-years**. None of it is causal. A ZIP code
@@ -1061,7 +1061,7 @@ width, political history. Section 8 says more.
 """)
 
 md(r"""
-## RQ1 — *Member 1*
+## RQ1
 ### Do ZIP codes that build the most affordable housing have more dangerous streets for pedestrians and cyclists?
 
 We rank ZIP-years by affordable units completed, split them into quartiles
@@ -1133,7 +1133,7 @@ of the city where a larger share of crash injuries are motorists. The contrast
 is largely *between different kinds of neighbourhood*, not between the same
 neighbourhood before and after it builds. RQ3 tests that directly.
 
-## RQ2 — *Member 1*
+## RQ2
 ### Is that gap widening or closing over time?
 
 Same two groups — ZIP-years in the top development quartile versus ZIP-years
@@ -1182,7 +1182,7 @@ cyclists became a larger *share* of a much smaller total.
 
 The trend is real enough to report, not strong enough to extrapolate.
 
-## RQ3 — *Member 2*
+## RQ3
 ### After a ZIP's biggest wave of completions, how do injuries move relative to its borough?
 
 For each ZIP we find its single largest completion year, then index crash
@@ -1264,7 +1264,7 @@ Two honest caveats. The window is short — at most three years either side
 inside a 2018–2025 slice — and 2020 sits inside almost every window, so the
 pandemic's traffic collapse is folded into both lines.
 
-## RQ4 — *Member 2*
+## RQ4
 ### Do big completion years behave differently from small ones?
 
 A distributional view rather than a mean: box plots of the vulnerable-road-user
@@ -1308,7 +1308,7 @@ almost no ZIP-years at the very low end — a floor rather than a ceiling effect
 Affordable housing goes into places that already have pedestrian activity, and
 such places do not produce near-zero pedestrian injury rates.
 
-## RQ5 — *Member 3*
+## RQ5
 ### Does the *depth* of affordability track street risk?
 
 Not just how much housing, but what kind. `deep_affordable_share` is the
@@ -1365,7 +1365,7 @@ and the shallow one may sit on very different streets inside the same postal
 area. Testing that properly needs the spatial join described in section 4.1,
 not this one.
 
-## RQ6 — *Member 3*
+## RQ6
 ### Which affordability band lands in the riskiest ZIP codes?
 
 We rank ZIPs into risk quintiles on their eight-year average vulnerable-road-user
@@ -1436,7 +1436,7 @@ up geographically. Note also that almost no affordable housing of any band
 reaches the safest quintile — those are low-density ZIPs that build very
 little.
 
-## RQ7 — *Member 4*
+## RQ7
 ### Where, on a map, do new affordable units and dangerous streets overlap?
 
 **This is the required cross-domain visualisation.** Each ZIP is a circle sized
@@ -1510,7 +1510,7 @@ housing goes onto dangerous streets" is too coarse: the *biggest* schemes go
 onto land that exists precisely because it has no street grid, and it is the
 infill projects that land in traffic.
 
-## RQ8 — *Member 4*
+## RQ8
 ### Which borough has the worst mismatch between what it builds and what its streets do?
 
 For each borough we compare its share of the city's new affordable units with
@@ -1573,7 +1573,7 @@ It says nothing about whether a given building made a given street worse. What
 it does say is that the city's housing investment and its street-safety burden
 are pointed at **different boroughs**, and that is actionable on its own terms.
 
-## RQ9 — *Member 5*
+## RQ9
 ### Do crashes near new affordable housing happen for different reasons?
 
 A heatmap of the ten most common contributing factors against the development
@@ -1633,7 +1633,7 @@ Note the limit: this classifies a crash by the *ZIP-year* it happened in, not
 by proximity to any building. It describes the kind of street environment
 these ZIPs have, not the effect of the housing in them.
 
-## RQ10 — *Member 5*
+## RQ10
 ### Is unit density associated with how *deadly* a ZIP's crashes are?
 
 Injury rate and death rate are different questions — a dense, slow, chaotic

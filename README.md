@@ -204,31 +204,38 @@ erroring when a filter combination returns nothing.
 
 ## Research questions
 
-Ten questions, two per team member, each with one chart.
+Ten questions, each with one chart.
 
-| # | Member | Question | Chart |
-|---|---|---|---|
-| 1 | Member 1 | Do ZIPs that build the most affordable housing have more dangerous streets for pedestrians and cyclists? | grouped bar by development quartile |
-| 2 | Member 1 | Is that gap widening or closing over 2018–2025? | two-series line |
-| 3 | Member 2 | After a ZIP's biggest completion wave, how do injuries move relative to its borough? | indexed event-study line with control |
-| 4 | Member 2 | Do big completion years differ from small ones in injury rate? | box plot by tier |
-| 5 | Member 3 | Does the *depth* of affordability track street risk? | bubble scatter with trend |
-| 6 | Member 3 | Which affordability band lands in the riskiest ZIPs? | stacked bar by risk quintile |
-| 7 | Member 4 | Where do new units and dangerous streets overlap geographically? | map, two layers |
-| 8 | Member 4 | Which borough absorbs more street harm than its share of new housing? | diverging bar |
-| 9 | Member 5 | Do crashes near new affordable housing happen for different reasons? | heatmap, factor × tier |
-| 10 | Member 5 | Is unit density associated with how *deadly* a ZIP's crashes are? | log-scale scatter with trend |
+| # | Question | Chart |
+|---|---|---|
+| 1 | Do ZIPs that build the most affordable housing have more dangerous streets for pedestrians and cyclists? | grouped bar by development quartile |
+| 2 | Is that gap widening or closing over 2018–2025? | two-series line |
+| 3 | After a ZIP's biggest completion wave, how do injuries move relative to its borough? | indexed event-study line with control |
+| 4 | Do big completion years differ from small ones in injury rate? | box plot by tier |
+| 5 | Does the *depth* of affordability track street risk? | bubble scatter with trend |
+| 6 | Which affordability band lands in the riskiest ZIPs? | stacked bar by risk quintile |
+| 7 | Where do new units and dangerous streets overlap geographically? | map, two layers |
+| 8 | Which borough absorbs more street harm than its share of new housing? | diverging bar |
+| 9 | Do crashes near new affordable housing happen for different reasons? | heatmap, factor × tier |
+| 10 | Is unit density associated with how *deadly* a ZIP's crashes are? | log-scale scatter with trend |
 
 ---
 
 ## Team contributions
 
-> Student IDs are deliberately **not** published here — they go in the submission
-> email only. Adjust the task lists below so they match what each person
-> actually did.
+> Student IDs are deliberately **not** published here — they go in the
+> submission email only.
+
+Team 42 was assigned five members. Three of them could not be reached at any
+point during the project and contributed nothing to it. The work below was done
+by the two of us.
 
 | Member | Name | Contribution |
 |---|---|---|
+| 1 | Mohamed Khaled Mohamed Mohamed Ismail | Dataset selection and paged download; pre-integration cleaning on both tables (ZIP standardisation, borough/coordinate recovery, completion-date fallback); the integration itself (aggregation to ZIP × year, join-type selection) and post-integration cleaning; the website — layout, filtering, search mode, Generate Report, map and borough charts; repository and deployment |
+| 2 | Norhan Mohamed Ahmed Nabeih Abdelghany Hameed | Exploratory data analysis and validation plots; the ten research questions and their analysis; scatter, trend, box and heatmap charts; outlier work and the notebook write-up, including findings and limitations |
+
+---|---|---|
 | 1 | Mohamed Tarek Borham | RQ1, RQ2 and their charts; housing-side pre-integration cleaning (ZIP standardisation, completion-date fallback rule); KPI row on the website |
 | 2 | Mohamed Khaled Mohamed Mohamed Ismail | RQ3, RQ4 and their charts; crash-side pre-integration cleaning (ZIP/borough recovery, coordinate validation); data download and paging; repository and deployment |
 | 3 | Norhan Mohamed Ahmed Nabeih Abdelghany Hameed | RQ5, RQ6 and their charts; dataset integration (aggregation to ZIP × year, join-type selection); scatter and trend charts on the website |
